@@ -11,10 +11,10 @@ import {
   Box,
   Lock,
   ChevronRight,
-  Swords // <--- Добавляем импорт Мечей (или используй Zap, если Swords нет)
+  Swords
 } from 'lucide-react';
 
-// Словарь иконок. Добавили 'swords' в конец списка.
+// Словарь иконок
 const iconMap: Record<string, any> = {
   brain: Brain,
   'git-branch': GitBranch,
@@ -23,9 +23,7 @@ const iconMap: Record<string, any> = {
   radio: Radio,
   cpu: Cpu,
   box: Box,
-  swords: Swords, // <--- ВАЖНО: Связываем строку из базы с компонентом
-  // Если иконки Swords нет и будет ошибка, замени Swords на Zap вот так:
-  // swords: Zap 
+  swords: Swords
 };
 
 const colorMap: Record<string, string> = {
@@ -64,7 +62,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
     const { data } = await supabase
       .from('sectors')
       .select('*')
-      .neq('id', 99) // <--- СКРЫВАЕМ PvP СЕКТОР С КАРТЫ (он у нас отдельной кнопкой)
+      .neq('id', 99) // Скрываем PvP сектор с карты
       .order('id');
 
     if (data) {
@@ -97,18 +95,72 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sectors.map((sector) => {
-            // Если иконка не найдена, используем Zap как заглушку, чтобы не было краша
+            // Безопасный выбор иконки
             const Icon = iconMap[sector.icon] || Zap;
             
             const unlocked = isUnlocked(sector);
             const gradient = colorMap[sector.color] || 'from-slate-500 to-slate-600';
             const glow = glowMap[sector.color] || 'shadow-slate-500/50';
 
+            // ВЫНЕСЛИ ЛОГИКУ СТИЛЕЙ СЮДА, ЧТОБЫ НЕ БЫЛО ОШИБКИ
+            const baseClasses = "relative group p-6 rounded-2xl border-2 transition-all duration-300";
+            const activeClasses = `bg-slate-800/50 backdrop-blur-sm border-${sector.color}-500/30 hover:border-${sector.color}-400 hover:shadow-2xl hover:${glow} hover:scale-[1.02] cursor-pointer`;
+            const lockedClasses = "bg-slate-900/30 border-slate-700/30 cursor-not-allowed opacity-50";
+            
+            const cardClassName = `${baseClasses} ${unlocked ? activeClasses : lockedClasses}`;
+
             return (
               <button
                 key={sector.id}
                 onClick={() => unlocked && onSectorSelect(sector)}
                 disabled={!unlocked}
-                className={`relative group p-6 rounded-2xl border-2 transition-all duration-300 ${
-                  unlocked
-                    ? `bg-slate-800/50 backdrop-blur-sm bord
+                className={cardClassName}
+              >
+                {!unlocked && (
+                  <div className="absolute top-4 right-4">
+                    <Lock className="w-5 h-5 text-slate-500" />
+                  </div>
+                )}
+
+                <div className="flex items-start gap-4 mb-4">
+                  <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} ${unlocked ? 'shadow-lg' : 'grayscale'}`}>
+                    <Icon className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-sm text-cyan-400/60">
+                        SECTOR {sector.id}
+                      </span>
+                      {unlocked && (
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      {sector.name}
+                    </h3>
+                  </div>
+                </div>
+
+                <p className="text-cyan-300/60 text-sm mb-4 text-left line-clamp-2">
+                  {sector.description}
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-cyan-400/40 font-mono">
+                    Требуется: LVL {sector.required_clearance}
+                  </div>
+                  {unlocked && (
+                    <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+                  )}
+                </div>
+
+                {/* Фоновое свечение */}
+                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-0 ${unlocked ? 'group-hover:opacity-5' : ''} transition-opacity pointer-events-none`} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
