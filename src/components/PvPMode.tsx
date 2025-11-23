@@ -165,7 +165,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-8 max-w-md w-full p-8 bg-slate-800/50 rounded-2xl border border-red-500/30 shadow-2xl shadow-red-900/20">
           <div className="mx-auto w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center animate-pulse">
-            <Zap className="w-12 h-12 text-red-500" />
+            <Sword
+              className="w-12 h-12 text-red-500" />
           </div>
           <div>
             <h1 className="text-4xl font-black text-white italic uppercase mb-2">PVP АРЕНА</h1>
