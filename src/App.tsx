@@ -6,7 +6,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-import { Menu, User, Settings, Trophy, Zap } from 'lucide-react';
+import { Menu, User, Settings, Trophy, Swords } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
 import { Leaderboard } from './components/Leaderboard';
