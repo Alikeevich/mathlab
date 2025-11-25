@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next'; // Подключаем отрисовку формул
 import 'katex/dist/katex.min.css'; // Стили для формул
+import { MathKeypad } from './MathKeypad';
 import {
   ArrowLeft,
   AlertCircle,
