@@ -28,15 +28,15 @@ const VIDEO_LIBRARY: Video[] = [
 
   // СЕКТОР 4: ТРИГОНОМЕТРИЯ
   { id: 'ZGSxIAZAS4s', title: 'Тригонометрический круг для чайников', sector: 4, duration: '20:00' },
-  { id: 'VideoID_9', title: 'Формулы приведения: Запоминаем без зубрежки', sector: 4, duration: '09:45' },
+  { id: 'csnBzAgZ9Qc', title: 'Формулы приведения: Запоминаем без зубрежки', sector: 4, duration: '09:45' },
 
   // СЕКТОР 5: ПРОИЗВОДНАЯ
-  { id: 'VideoID_10', title: 'Физический и геометрический смысл производной', sector: 5, duration: '13:20' },
-  { id: 'VideoID_11', title: 'Таблица интегралов', sector: 5, duration: '16:00' },
+  { id: 'gcxCgGjku38', title: 'Физический и геометрический смысл производной', sector: 5, duration: '13:20' },
+  { id: 'iE-B0LIFm9I', title: 'Таблица интегралов', sector: 5, duration: '16:00' },
 
   // СЕКТОР 6: ГЕОМЕТРИЯ
-  { id: 'VideoID_12', title: 'Вся Планиметрия: Формулы площадей', sector: 6, duration: '25:00' },
-  { id: 'VideoID_13', title: 'Стереометрия: Сечения многогранников', sector: 6, duration: '19:15' },
+  { id: 'EBr2XaAn_Fw', title: 'Вся Планиметрия: Формулы площадей', sector: 6, duration: '25:00' },
+  { id: 'jsRiZy-feaE', title: 'Стереометрия: Сечения многогранников', sector: 6, duration: '19:15' },
 ];
 
 // Названия вкладок
