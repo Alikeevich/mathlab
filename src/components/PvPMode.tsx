@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer } from 'lucide-react';
+import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer, WifiOff, ArrowLeft } from 'lucide-react';
 import { getPvPRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
 
@@ -27,23 +27,32 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   const [oppProgress, setOppProgress] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [winner, setWinner] = useState<'me' | 'opponent' | 'draw' | null>(null);
+  
+  // Состояние "Враг отключился"
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
 
   // Фидбек и Таймер
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // Функции клавиатуры
-  const handleKeyInput = (symbol: string) => setUserAnswer((prev) => prev + symbol);
-  const handleBackspace = () => setUserAnswer((prev) => prev.slice(0, -1));
+  // === ФУНКЦИИ КЛАВИАТУРЫ ===
+  const handleKeyInput = (symbol: string) => {
+    setUserAnswer((prev) => prev + symbol);
+  };
 
-  // === ТАЙМЕР ЗАДАЧИ ===
+  const handleBackspace = () => {
+    setUserAnswer((prev) => prev.slice(0, -1));
+  };
+
+  // === 1. ТАЙМЕР ЗАДАЧИ ===
   useEffect(() => {
     let timer: any;
+    // Запускаем таймер только в бою, если нет анимации фидбека и есть задачи
     if (status === 'battle' && !feedback && currentProbIndex < 10) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
-            handleTimeout();
+            handleTimeout(); // Время вышло
             return 60;
           }
           return prev - 1;
@@ -53,58 +62,83 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     return () => clearInterval(timer);
   }, [status, feedback, currentProbIndex]);
 
-  useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
-  const handleTimeout = () => submitResult(false);
+  // Сброс таймера при смене вопроса
+  useEffect(() => {
+    setTimeLeft(60);
+  }, [currentProbIndex]);
 
-  // === HEARTBEAT & POLLING (Самое важное!) ===
-  // Если я ХОСТ (создал комнату и жду), я должен:
-  // 1. Проверять, не зашел ли кто.
-  // 2. Обновлять last_seen, чтобы комната не считалась мертвой.
+  // Если время вышло - засчитываем ошибку
+  const handleTimeout = () => {
+    submitResult(false);
+  };
+
+  // === 2. HEARTBEAT БИТВЫ (Проверка соединения) ===
+  // Каждые 5 секунд обновляем свой статус и проверяем врага
   useEffect(() => {
     let interval: any;
 
-    if (status === 'searching' && duelId) {
+    if (status === 'battle' && duelId) {
       interval = setInterval(async () => {
-        // 1. Отправляем сигнал "Я тут" (Heartbeat)
-        await supabase
-          .from('duels')
-          .update({ last_seen: new Date().toISOString() })
-          .eq('id', duelId);
+        // 1. Отправляем "Я ЖИВОЙ"
+        const { data: duelInfo } = await supabase.from('duels').select('player1_id').eq('id', duelId).single();
+        if (!duelInfo) return;
 
-        // 2. Проверяем статус
-        const { data } = await supabase
-          .from('duels')
-          .select('status, player2_id')
-          .eq('id', duelId)
-          .single();
+        const isP1 = duelInfo.player1_id === user!.id;
+        const updateField = isP1 ? 'player1_last_seen' : 'player2_last_seen';
+        
+        await supabase.from('duels').update({ [updateField]: new Date().toISOString() }).eq('id', duelId);
 
-        if (data && data.status === 'active' && data.player2_id) {
-          clearInterval(interval);
-          await fetchOpponentData(data.player2_id);
-          setStatus('battle');
+        // 2. Проверяем соперника
+        const { data } = await supabase.from('duels').select('player1_last_seen, player2_last_seen').eq('id', duelId).single();
+        
+        if (data) {
+          const oppLastSeen = isP1 ? data.player2_last_seen : data.player1_last_seen;
+          
+          if (oppLastSeen) {
+            const diff = Date.now() - new Date(oppLastSeen).getTime();
+            // Если соперник молчит больше 30 секунд (30000 мс)
+            if (diff > 30000) {
+              setOpponentDisconnected(true);
+              // Объявляем техническую победу через SQL функцию
+              await supabase.rpc('claim_timeout_win', { duel_uuid: duelId, claimant_uuid: user!.id });
+            }
+          }
         }
-      }, 2000); // Каждые 2 секунды
+      }, 5000);
     }
-
     return () => clearInterval(interval);
   }, [status, duelId]);
 
-  // === ПОИСК МАТЧА С ЧИСТКОЙ МЕРТВЕЦОВ ===
+
+  // === 3. ЛОГИКА ПОИСКА (С POLLING) ===
+  // Страховка для Хоста: долбим базу, пока ждем
+  useEffect(() => {
+    let interval: any;
+    if (status === 'searching' && duelId) {
+      interval = setInterval(async () => {
+        const { data } = await supabase.from('duels').select('status, player2_id').eq('id', duelId).single();
+        // Если кто-то зашел
+        if (data && data.status === 'active' && data.player2_id) {
+          clearInterval(interval);
+          const oppId = data.player2_id; // Если я хост, то враг всегда player2
+          await fetchOpponentData(oppId);
+          setStatus('battle');
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [status, duelId]);
+
   async function findMatch() {
     setStatus('searching');
     const myMMR = profile?.mmr || 1000;
     const range = 300;
 
-    // ШАГ 0: Чистка мусора (Dead Room Cleanup)
-    // Удаляем комнаты, где хозяин молчит больше 20 секунд
-    const twentySecondsAgo = new Date(Date.now() - 20000).toISOString();
-    await supabase
-      .from('duels')
-      .delete()
-      .eq('status', 'waiting')
-      .lt('last_seen', twentySecondsAgo); // Меньше (старее) чем 20 сек назад
+    // Чистка старых комнат (уборщик мусора)
+    const oldTime = new Date(Date.now() - 20000).toISOString();
+    await supabase.from('duels').delete().eq('status', 'waiting').lt('last_seen', oldTime);
 
-    // ШАГ 1: Ищем ЖИВУЮ комнату
+    // 1. Ищем существующую
     const { data: waitingDuel } = await supabase
       .from('duels')
       .select('*')
@@ -112,12 +146,11 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       .neq('player1_id', user!.id)
       .gte('player1_mmr', myMMR - range)
       .lte('player1_mmr', myMMR + range)
-      .gt('last_seen', twentySecondsAgo) // Только те, кто обновлялся недавно
       .limit(1)
       .maybeSingle();
 
     if (waitingDuel) {
-      // ДЖОЙНЕР
+      // ---> ДЖОЙНЕР (Присоединяемся)
       setDuelId(waitingDuel.id);
       await loadProblems(waitingDuel.problem_ids);
       await fetchOpponentData(waitingDuel.player1_id);
@@ -125,17 +158,17 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       await supabase
         .from('duels')
         .update({ 
-          player2_id: user!.id,
-          player2_mmr: myMMR,
-          status: 'active' 
+          player2_id: user!.id, 
+          player2_mmr: myMMR, 
+          status: 'active',
+          player2_last_seen: new Date().toISOString()
         })
         .eq('id', waitingDuel.id);
       
       startBattleSubscription(waitingDuel.id, 'player2');
       setStatus('battle');
-      
     } else {
-      // ХОСТ
+      // ---> ХОСТ (Создаем)
       const { data: allProbs } = await supabase
         .from('problems')
         .select('id')
@@ -149,35 +182,36 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           player1_id: user!.id,
           player1_mmr: myMMR,
           status: 'waiting',
-          last_seen: new Date().toISOString(), // Ставим метку времени
+          last_seen: new Date().toISOString(),
+          player1_last_seen: new Date().toISOString(),
           problem_ids: shuffled
         })
-        .select()
-        .single();
+        .select().single();
 
       if (newDuel) {
         setDuelId(newDuel.id);
         await loadProblems(shuffled);
         startBattleSubscription(newDuel.id, 'player1');
-        // Остаемся в 'searching', useEffect с Heartbeat сам запустится
+        // Ждем в статусе searching, поллинг нас переключит
       }
     }
   }
 
-  // === 4. ПОДПИСКА НА ВРАГА ===
+  // === 4. ПОДПИСКА И ИГРА ===
   function startBattleSubscription(id: string, myRole: 'player1' | 'player2') {
-    supabase
-      .channel(`duel-${id}`)
+    supabase.channel(`duel-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` }, 
       (payload) => {
         const newData = payload.new;
-
+        
+        // Хост просыпается, если поллинг не успел
         if (newData.status === 'active' && status === 'searching') {
            if (myRole === 'player1' && newData.player2_id) {
              fetchOpponentData(newData.player2_id).then(() => setStatus('battle'));
            }
         }
-
+        
+        // Обновляем очки врага
         if (myRole === 'player1') {
           setOppScore(newData.player2_score);
           setOppProgress(newData.player2_progress);
@@ -185,22 +219,21 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           setOppScore(newData.player1_score);
           setOppProgress(newData.player1_progress);
         }
-
-        if (newData.status === 'finished') {
-          endGame(newData.winner_id);
-        }
+        
+        // Конец игры
+        if (newData.status === 'finished') endGame(newData.winner_id);
       })
       .subscribe();
   }
 
-  // === 5. ОБРАБОТКА ОТВЕТА ===
+  // Обработка кнопки ответа
   async function handleAnswer(e: React.FormEvent) {
     e.preventDefault();
+    // Блокировка: если нет ID, идет анимация или пустой ответ
     if (!duelId || feedback || userAnswer.trim() === '') return; 
-
+    
     const currentProb = problems[currentProbIndex];
     const isCorrect = userAnswer.toLowerCase().trim() === currentProb.answer.toLowerCase().trim();
-    
     submitResult(isCorrect);
   }
 
@@ -214,15 +247,18 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     const { data: duel } = await supabase.from('duels').select('player1_id').eq('id', duelId!).single();
     const isP1 = duel?.player1_id === user!.id;
     const updateData = isP1 
-      ? { player1_score: newScore, player1_progress: newProgress }
-      : { player2_score: newScore, player2_progress: newProgress };
+      ? { player1_score: newScore, player1_progress: newProgress, player1_last_seen: new Date().toISOString() }
+      : { player2_score: newScore, player2_progress: newProgress, player2_last_seen: new Date().toISOString() };
     
+    // Отправляем данные и проверяем победу
     supabase.from('duels').update(updateData).eq('id', duelId!).then(async () => {
        if (newProgress >= 10) {
+          // Вызываем защищенную функцию финиша
           await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
        }
     });
 
+    // Задержка перед следующим вопросом
     setTimeout(() => {
       setFeedback(null);
       setCurrentProbIndex(newProgress);
@@ -230,20 +266,17 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     }, 1000);
   }
 
-  // Вспомогательные
+  // === ВСПОМОГАТЕЛЬНЫЕ ===
   async function loadProblems(ids: string[]) {
     if (!ids || ids.length === 0) return;
     const { data } = await supabase.from('problems').select('*').in('id', ids);
+    // Сортировка важна, чтобы вопросы шли в одинаковом порядке
     const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
     setProblems(sorted);
   }
 
   async function fetchOpponentData(uid: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('username, mmr')
-      .eq('id', uid)
-      .single();
+    const { data } = await supabase.from('profiles').select('username, mmr').eq('id', uid).single();
     if (data) {
       setOpponentName(data.username);
       setOpponentMMR(data.mmr || 1000);
@@ -252,14 +285,13 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
 
   function endGame(winnerId: string) {
     setStatus('finished');
-    if (winnerId === user!.id) {
-      setWinner('me');
-    } else {
-      setWinner('opponent');
-    }
+    if (winnerId === user!.id) setWinner('me');
+    else setWinner('opponent');
   }
 
-  // === РЕНДЕР ===
+  // === РЕНДЕР (UI) ===
+  
+  // 1. ЛОББИ
   if (status === 'lobby') {
     return (
       <div className="flex items-center justify-center h-full">
@@ -281,14 +313,15 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
             <Play className="w-6 h-6 fill-current" />
             НАЙТИ СОПЕРНИКА
           </button>
-          <button onClick={onBack} className="text-slate-500 hover:text-white text-sm">
-            Вернуться в лабораторию
+          <button onClick={onBack} className="text-slate-500 hover:text-white text-sm flex items-center justify-center gap-2">
+            <ArrowLeft className="w-4 h-4" /> Вернуться в лабораторию
           </button>
         </div>
       </div>
     );
   }
 
+  // 2. ПОИСК
   if (status === 'searching') {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-6">
@@ -300,7 +333,6 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         </div>
         <button onClick={async () => { 
            setStatus('lobby'); 
-           // Если я ухожу из поиска, я удаляю свою комнату, чтобы она не висела
            if (duelId) await supabase.from('duels').delete().eq('id', duelId);
            setDuelId(null);
         }} className="px-6 py-2 border border-slate-600 rounded-full text-slate-400 hover:bg-slate-800">
@@ -310,11 +342,22 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     );
   }
 
+  // 3. БИТВА
   if (status === 'battle') {
     const currentProb = problems[currentProbIndex];
 
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
+        
+        {/* Уведомление о дисконнекте врага */}
+        {opponentDisconnected && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
+            <WifiOff className="w-4 h-4" />
+            <span>Соперник теряет соединение...</span>
+          </div>
+        )}
+
+        {/* Оверлей ответа */}
         {feedback && (
           <div className={`absolute inset-0 z-50 flex items-center justify-center rounded-3xl backdrop-blur-sm animate-in fade-in duration-200 ${
             feedback === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'
@@ -325,6 +368,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
+        {/* Шапка очков */}
         <div className="flex items-center justify-between mb-6 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
           <div className="text-right">
             <div className="text-cyan-400 font-bold text-lg">ВЫ</div>
@@ -345,6 +389,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
+        {/* Прогресс */}
         <div className="space-y-4 mb-6">
           <div>
              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -358,6 +403,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
+        {/* Вопрос */}
         <div className="flex-1 flex flex-col justify-center">
           {currentProbIndex < 10 && currentProb ? (
             <div className="bg-slate-800 border border-slate-600 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
@@ -368,6 +414,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
                <h2 className="text-3xl font-bold text-white mb-8 leading-relaxed">
                  <Latex>{currentProb.question}</Latex>
                </h2>
+               
+               {/* Форма с клавиатурой */}
                <form onSubmit={handleAnswer} className="flex flex-col gap-4">
                  <div className="flex gap-4">
                    <input 
@@ -403,6 +451,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     );
   }
 
+  // 4. ФИНИШ
   if (status === 'finished') {
     return (
       <div className="flex items-center justify-center h-full">
@@ -413,7 +462,11 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
               <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-4">
                 ПОБЕДА!
               </h1>
-              <p className="text-slate-300 text-lg mb-8">Рейтинг повышен! (+25 MMR)</p>
+              {opponentDisconnected ? (
+                 <p className="text-emerald-300 text-lg mb-8">Соперник сбежал с поля боя.</p>
+              ) : (
+                 <p className="text-slate-300 text-lg mb-8">Рейтинг повышен! (+25 MMR)</p>
+              )}
             </>
           ) : (
             <>
