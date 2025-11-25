@@ -28,21 +28,28 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   async function findMatch() {
     setStatus('searching');
     
-    // 1. Ищем, есть ли кто-то ждущий
+    // Получаем мой текущий рейтинг
+    const myMMR = profile?.mmr || 1000;
+    const range = 300; // Разброс рейтинга (ищем соперника +/- 300 очков)
+
+    // 1. Ищем, есть ли кто-то ждущий В МОЕМ ДИАПАЗОНЕ СИЛЫ
     const { data: waitingDuel } = await supabase
       .from('duels')
       .select('*')
       .eq('status', 'waiting')
       .neq('player1_id', user!.id)
+      .gte('player1_mmr', myMMR - range) // Не слабее чем -300
+      .lte('player1_mmr', myMMR + range) // Не сильнее чем +300
       .limit(1)
       .maybeSingle();
 
     if (waitingDuel) {
-      // НАШЛИ СОПЕРНИКА
+      // НАШЛИ ДОСТОЙНОГО СОПЕРНИКА
       await supabase
         .from('duels')
         .update({ 
-          player2_id: user!.id, 
+          player2_id: user!.id,
+          player2_mmr: myMMR, // Записываем свой рейтинг
           status: 'active' 
         })
         .eq('id', waitingDuel.id);
@@ -52,7 +59,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       fetchOpponentName(waitingDuel.player1_id);
       startBattleSubscription(waitingDuel.id, 'player2');
     } else {
-      // НЕТ СОПЕРНИКА -> СОЗДАЕМ КОМНАТУ
+      // НЕТ ПОДХОДЯЩИХ -> СОЗДАЕМ КОМНАТУ И ЖДЕМ
       const { data: allProbs } = await supabase
         .from('problems')
         .select('id')
@@ -64,6 +71,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         .from('duels')
         .insert({
           player1_id: user!.id,
+          player1_mmr: myMMR, // Сохраняем мой рейтинг, чтобы другие могли фильтровать
           status: 'waiting',
           problem_ids: shuffled
         })
@@ -145,9 +153,11 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     await supabase.from('duels').update(updateData).eq('id', duelId);
 
     if (newProgress >= 10) {
-      await supabase.from('duels').update({ status: 'finished', winner_id: user!.id }).eq('id', duelId);
+      await supabase.rpc('finish_duel', { 
+        duel_uuid: duelId, 
+        winner_uuid: user!.id 
+      });
     }
-  }
 
   function endGame(winnerId: string) {
     setStatus('finished');
