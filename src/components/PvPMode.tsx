@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer } from 'lucide-react';
 import { getPvPRank } from '../lib/gameLogic';
+import { MathKeypad } from './MathKeypad';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
 
