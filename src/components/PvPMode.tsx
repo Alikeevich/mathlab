@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer } from 'lucide-react';
 import { getPvPRank } from '../lib/gameLogic';
+// Импорт клавиатуры
 import { MathKeypad } from './MathKeypad';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
@@ -31,6 +32,15 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   // Фидбек и Таймер
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60); // 60 секунд на задачу
+
+  // === ФУНКЦИИ КЛАВИАТУРЫ (ДОБАВИЛ) ===
+  const handleKeyInput = (symbol: string) => {
+    setUserAnswer((prev) => prev + symbol);
+  };
+
+  const handleBackspace = () => {
+    setUserAnswer((prev) => prev.slice(0, -1));
+  };
 
   // === 1. ТАЙМЕР ЗАДАЧИ ===
   useEffect(() => {
@@ -60,28 +70,23 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   };
 
   // === 2. СТРАХОВКА (POLLING) ДЛЯ ХОСТА ===
-  // Если мы ищем игру и создали комнату, долбим базу: "Кто-нибудь зашел?"
   useEffect(() => {
     let interval: any;
 
     if (status === 'searching' && duelId) {
       interval = setInterval(async () => {
-        // Проверяем статус нашей дуэли
         const { data } = await supabase
           .from('duels')
           .select('status, player2_id')
           .eq('id', duelId)
           .single();
 
-        // Если статус стал active (второй игрок зашел и обновил статус)
         if (data && data.status === 'active' && data.player2_id) {
           clearInterval(interval);
-          
-          // Определяем ID соперника (это точно player2, раз мы хостили)
           await fetchOpponentData(data.player2_id);
           setStatus('battle');
         }
-      }, 1000); // Проверка каждую секунду
+      }, 1000);
     }
 
     return () => clearInterval(interval);
@@ -93,7 +98,6 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     const myMMR = profile?.mmr || 1000;
     const range = 300;
 
-    // 1. Ищем существующую комнату (чтобы ПРИСОЕДИНИТЬСЯ)
     const { data: waitingDuel } = await supabase
       .from('duels')
       .select('*')
@@ -105,13 +109,11 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       .maybeSingle();
 
     if (waitingDuel) {
-      // ---> МЫ ДЖОЙНЕР (ПРИСОЕДИНЯЕМСЯ)
-      // 1. Сначала грузим данные, чтобы не было задержек
+      // ДЖОЙНЕР
       setDuelId(waitingDuel.id);
       await loadProblems(waitingDuel.problem_ids);
       await fetchOpponentData(waitingDuel.player1_id);
       
-      // 2. Обновляем базу (это триггернет Хоста)
       await supabase
         .from('duels')
         .update({ 
@@ -121,12 +123,11 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         })
         .eq('id', waitingDuel.id);
       
-      // 3. Подписываемся и стартуем
       startBattleSubscription(waitingDuel.id, 'player2');
       setStatus('battle');
       
     } else {
-      // ---> МЫ ХОСТ (СОЗДАЕМ)
+      // ХОСТ
       const { data: allProbs } = await supabase
         .from('problems')
         .select('id')
@@ -147,9 +148,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
 
       if (newDuel) {
         setDuelId(newDuel.id);
-        await loadProblems(shuffled); // Грузим задачи сразу
+        await loadProblems(shuffled);
         startBattleSubscription(newDuel.id, 'player1');
-        // Остаемся в статусе 'searching', useEffect сверху сам переключит нас в 'battle'
       }
     }
   }
@@ -162,14 +162,12 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
       (payload) => {
         const newData = payload.new;
 
-        // Если статус поменялся на active (для Хоста, если поллинг опоздал)
         if (newData.status === 'active' && status === 'searching') {
            if (myRole === 'player1' && newData.player2_id) {
              fetchOpponentData(newData.player2_id).then(() => setStatus('battle'));
            }
         }
 
-        // Обновляем очки врага
         if (myRole === 'player1') {
           setOppScore(newData.player2_score);
           setOppProgress(newData.player2_progress);
@@ -188,7 +186,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   // === 5. ОБРАБОТКА ОТВЕТА ===
   async function handleAnswer(e: React.FormEvent) {
     e.preventDefault();
-    if (!duelId || feedback) return; // Не даем жать кнопку, пока идет анимация
+    // Проверка на пустой ответ
+    if (!duelId || feedback || userAnswer.trim() === '') return; 
 
     const currentProb = problems[currentProbIndex];
     const isCorrect = userAnswer.toLowerCase().trim() === currentProb.answer.toLowerCase().trim();
@@ -197,15 +196,12 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   }
 
   async function submitResult(isCorrect: boolean) {
-    // 1. Показываем анимацию
     setFeedback(isCorrect ? 'correct' : 'wrong');
     
-    // 2. Считаем очки
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
 
-    // 3. Отправляем в базу (в фоне)
     const { data: duel } = await supabase.from('duels').select('player1_id').eq('id', duelId!).single();
     const isP1 = duel?.player1_id === user!.id;
     const updateData = isP1 
@@ -214,11 +210,10 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     
     supabase.from('duels').update(updateData).eq('id', duelId!).then(async () => {
        if (newProgress >= 10) {
-          await supabase.rpc('finish_duel', { duel_uuid: duelId, winner_uuid: user!.id });
+          await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
        }
     });
 
-    // 4. Ждем 1 секунду и переключаем задачу
     setTimeout(() => {
       setFeedback(null);
       setCurrentProbIndex(newProgress);
@@ -307,7 +302,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
         
-        {/* ФИДБЕК ОВЕРЛЕЙ (Зеленый/Красный экран) */}
+        {/* ФИДБЕК ОВЕРЛЕЙ */}
         {feedback && (
           <div className={`absolute inset-0 z-50 flex items-center justify-center rounded-3xl backdrop-blur-sm animate-in fade-in duration-200 ${
             feedback === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'
@@ -369,23 +364,29 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
                  <Latex>{currentProb.question}</Latex>
                </h2>
                
-               <form onSubmit={handleAnswer} className="flex gap-4">
-                 <input 
-                    autoFocus
-                    type="text" 
-                    value={userAnswer}
-                    onChange={e => setUserAnswer(e.target.value)}
-                    disabled={!!feedback} // Блокируем ввод во время анимации
-                    className="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-6 py-4 text-xl text-white outline-none focus:border-cyan-500 transition-colors disabled:opacity-50"
-                    placeholder="Ваш ответ..."
-                 />
-                 <button 
-                    type="submit" 
-                    disabled={!!feedback || !userAnswer}
-                    className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl transition-colors"
-                 >
-                   GO
-                 </button>
+               {/* ФОРМА С КЛАВИАТУРОЙ */}
+               <form onSubmit={handleAnswer} className="flex flex-col gap-4">
+                 <div className="flex gap-4">
+                   <input 
+                      autoFocus
+                      type="text" 
+                      value={userAnswer}
+                      onChange={e => setUserAnswer(e.target.value)}
+                      disabled={!!feedback}
+                      className="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-6 py-4 text-xl text-white outline-none focus:border-cyan-500 transition-colors disabled:opacity-50 font-mono"
+                      placeholder="Ваш ответ..."
+                   />
+                   <button 
+                      type="submit" 
+                      disabled={!!feedback || userAnswer.trim() === ''}
+                      className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl transition-colors disabled:cursor-not-allowed"
+                   >
+                     GO
+                   </button>
+                 </div>
+                 
+                 {/* ВСТАВКА КЛАВИАТУРЫ */}
+                 <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
                </form>
             </div>
           ) : (
