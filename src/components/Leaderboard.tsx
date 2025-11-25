@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Trophy, Medal, User } from 'lucide-react';
+// Добавили Zap (Молнию) для иконки рейтинга
+import { Trophy, Zap } from 'lucide-react';
 import { getRank } from '../lib/gameLogic';
 
 export function Leaderboard({ onClose }: { onClose: () => void }) {
@@ -9,11 +10,11 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     async function loadLeaders() {
-      // Берем топ 10 по количеству экспериментов
+      // 1. ВАЖНО: Добавили 'mmr' в список полей
       const { data } = await supabase
         .from('profiles')
-        .select('username, clearance_level, total_experiments, success_rate')
-        .order('total_experiments', { ascending: false })
+        .select('username, clearance_level, total_experiments, success_rate, mmr') 
+        .order('total_experiments', { ascending: false }) // Сортируем по опыту (кто больше решил)
         .limit(10);
       
       if (data) setLeaders(data);
@@ -25,7 +26,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-slate-900/95 z-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-slate-800 border border-amber-500/30 rounded-2xl p-8 relative overflow-hidden">
-        {/* Фоновoe свечение */}
+        {/* Фоновое свечение */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/10 blur-[100px] rounded-full" />
         
         <div className="flex justify-between items-center mb-8 relative z-10">
@@ -43,12 +44,15 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="space-y-3 relative z-10">
+        <div className="space-y-3 relative z-10 max-h-[60vh] overflow-y-auto pr-2">
           {loading ? (
              <div className="text-center text-slate-500 py-10">Загрузка данных...</div>
           ) : leaders.map((player, index) => {
             const rank = getRank(player.clearance_level);
             const isTop3 = index < 3;
+            
+            // Если mmr нет (null), считаем что он 1000
+            const displayMMR = player.mmr || 1000;
             
             return (
               <div 
@@ -59,6 +63,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                     : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
                 }`}
               >
+                {/* Номер места */}
                 <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-xl ${
                   index === 0 ? 'bg-amber-400 text-slate-900' :
                   index === 1 ? 'bg-slate-300 text-slate-900' :
@@ -68,6 +73,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                   {index + 1}
                 </div>
 
+                {/* Информация об игроке */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-white text-lg">{player.username}</span>
@@ -82,12 +88,18 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-sm text-slate-400">Точность</div>
-                  <div className={`font-mono font-bold ${
-                    player.success_rate > 80 ? 'text-emerald-400' : 'text-slate-200'
-                  }`}>
-                    {Number(player.success_rate).toFixed(0)}%
+                {/* ПРАВАЯ ЧАСТЬ: Рейтинг и Точность */}
+                <div className="text-right flex flex-col items-end gap-1">
+                  
+                  {/* Красная плашка с Рейтингом */}
+                  <div className="flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded text-red-400 font-mono font-bold text-sm border border-red-500/20" title="PvP Рейтинг">
+                    <Zap className="w-3 h-3 fill-current" />
+                    {displayMMR}
+                  </div>
+
+                  {/* Точность */}
+                  <div className="text-xs text-slate-500">
+                    Точность: {Number(player.success_rate).toFixed(0)}%
                   </div>
                 </div>
               </div>
