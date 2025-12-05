@@ -15,7 +15,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     async function createTournament() {
       if (!user) return;
-      // Генерируем код (например: 4829)
       const code = Math.floor(1000 + Math.random() * 9000).toString();
       
       const { data } = await supabase
