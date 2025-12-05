@@ -99,7 +99,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
     return answer.toLowerCase().replace(/\s+/g, '').replace(',', '.');
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!currentProblem || !user) return;
 
@@ -108,23 +108,25 @@ export function Reactor({ module, onBack }: ReactorProps) {
 
     setResult(isCorrect ? 'correct' : 'incorrect');
 
+    // 1. ПРОСТО ОТПРАВЛЯЕМ ДАННЫЕ В БАЗУ
+    // Вся магия (расчет точности, начисление XP, проверка на гринд) 
+    // теперь происходит внутри SQL-триггера handle_new_experiment
     await supabase.from('experiments').insert({
       user_id: user.id,
       module_id: module.id,
+      problem_id: currentProblem.id, // ВАЖНО: убедись, что это поле есть в типе Problem
       problem_type: currentProblem.type,
       correct: isCorrect,
       time_spent: timeSpent,
     });
 
+    // 2. Локальная статистика (чисто для визуала текущей сессии)
     setProblemsSolved(prev => prev + 1);
     if (isCorrect) {
       setCorrectCount(prev => prev + 1);
     }
 
-    const newTotal = (profile?.total_experiments ?? 0) + 1;
-    await supabase.from('profiles').update({ total_experiments: newTotal }).eq('id', user.id);
-
-    // Обновляем прогресс
+    // 3. Обновляем прогресс МОДУЛЯ (Это оставляем на фронте для красоты полоски)
     const { data: progressData } = await supabase
       .from('user_progress')
       .select('*')
@@ -132,22 +134,25 @@ export function Reactor({ module, onBack }: ReactorProps) {
       .eq('module_id', module.id)
       .maybeSingle();
 
-    const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
-    const newPercentage = Math.min(newExperiments * 10, 100);
+    // Если решили правильно - добавляем прогресс, если нет - нет
+    if (isCorrect) {
+       const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
+       const newPercentage = Math.min(newExperiments * 10, 100);
 
-    if (progressData) {
-      await supabase.from('user_progress').update({
-          experiments_completed: newExperiments,
-          completion_percentage: newPercentage,
-          last_accessed: new Date().toISOString(),
-        }).eq('id', progressData.id);
-    } else {
-      await supabase.from('user_progress').insert({
-        user_id: user.id,
-        module_id: module.id,
-        experiments_completed: 1,
-        completion_percentage: 10,
-      });
+       if (progressData) {
+         await supabase.from('user_progress').update({
+             experiments_completed: newExperiments,
+             completion_percentage: newPercentage,
+             last_accessed: new Date().toISOString(),
+           }).eq('id', progressData.id);
+       } else {
+         await supabase.from('user_progress').insert({
+           user_id: user.id,
+           module_id: module.id,
+           experiments_completed: 1,
+           completion_percentage: 10,
+         });
+       }
     }
 
     setTimeout(() => {
