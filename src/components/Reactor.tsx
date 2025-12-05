@@ -104,7 +104,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
     if (!currentProblem || !user) return;
 
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    const isCorrect = normalizeAnswer(userAnswer) === normalizeAnswer(currentProblem.answer);
+    const isCorrect = checkAnswer(userAnswer, currentProblem.answer);
 
     setResult(isCorrect ? 'correct' : 'incorrect');
 
