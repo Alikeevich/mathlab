@@ -28,12 +28,9 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   const [userAnswer, setUserAnswer] = useState('');
   const [winner, setWinner] = useState<'me' | 'opponent' | 'draw' | null>(null);
   
-  // Состояние "Враг отключился"
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
-  // Состояние Модалки Сдачи
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
 
-  // Фидбек и Таймер
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
 
@@ -47,13 +44,10 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   };
 
   // === ЛОГИКА ВЫХОДА / СДАЧИ ===
-  
-  // Нажатие на кнопку "Назад" или "Сдаться"
   const handleExitRequest = () => {
     if (status === 'battle') {
-      setShowSurrenderModal(true); // Показываем нашу красивую модалку
+      setShowSurrenderModal(true);
     } else {
-      // Если мы в лобби или поиске - просто выходим, но чистим за собой
       if (status === 'searching' && duelId) {
         supabase.from('duels').delete().eq('id', duelId).then(() => {});
       }
@@ -61,16 +55,13 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
     }
   };
 
-  // Подтверждение сдачи
   const confirmSurrender = async () => {
     setShowSurrenderModal(false);
     if (duelId && user) {
-      // 1. Отправляем в базу инфу, что мы сдались
       await supabase.rpc('surrender_duel', { 
         duel_uuid: duelId, 
         surrendering_uuid: user.id 
       });
-      // 2. Локально завершаем (хотя Realtime тоже прилетит, так надежнее)
       onBack(); 
     }
   };
@@ -277,20 +268,19 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
   }
 
   // === РЕНДЕР ===
-  
   return (
     <>
-      {/* --- МОДАЛКА СДАЧИ (КРАСИВАЯ) --- */}
+      {/* МОДАЛКА СДАЧИ */}
       {showSurrenderModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-100 animate-in fade-in zoom-in duration-200">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Признать поражение?</h3>
               <p className="text-slate-400 text-sm">
-                Вы собираетесь покинуть битву. Это будет засчитано как поражение, и вы потеряете <span className="text-red-400 font-bold">25 MMR</span>.
+                Вы потеряете <span className="text-red-400 font-bold">25 MP</span>.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -311,8 +301,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      {/* --- ЭКРАНЫ --- */}
-
+      {/* ЛОББИ */}
       {status === 'lobby' && (
         <div className="flex items-center justify-center h-full">
           <div className="text-center space-y-8 max-w-md w-full p-8 bg-slate-800/50 rounded-2xl border border-red-500/30 shadow-2xl shadow-red-900/20">
@@ -326,7 +315,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
                <div className="text-sm text-slate-400">Ваш рейтинг</div>
                <div className="text-2xl font-bold text-red-400">
-                 {profile?.mmr || 1000} MMR <span className="text-sm text-slate-500">({getPvPRank(profile?.mmr || 1000)})</span>
+                 {profile?.mmr || 1000} MP <span className="text-sm text-slate-500">({getPvPRank(profile?.mmr || 1000)})</span>
                </div>
             </div>
             <button onClick={findMatch} className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-bold text-white text-xl hover:scale-105 transition-transform shadow-lg shadow-red-500/30 flex items-center justify-center gap-2">
@@ -340,13 +329,14 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {/* ПОИСК */}
       {status === 'searching' && (
         <div className="flex flex-col items-center justify-center h-full space-y-6">
           <Loader className="w-16 h-16 text-red-500 animate-spin" />
           <h2 className="text-2xl font-bold text-white animate-pulse">Поиск противника...</h2>
           <div className="text-slate-400 text-sm max-w-xs text-center">
             Ожидаем подключения...<br/>
-            (Ваш рейтинг: {profile?.mmr || 1000})
+            (Ваш рейтинг: {profile?.mmr || 1000} MP)
           </div>
           <button onClick={handleExitRequest} className="px-6 py-2 border border-slate-600 rounded-full text-slate-400 hover:bg-slate-800">
             Отмена
@@ -354,6 +344,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {/* БИТВА */}
       {status === 'battle' && (
         <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
           
@@ -375,9 +366,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
           )}
 
           <div className="flex items-center justify-between mb-6 bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative">
-            
             <button 
-              onClick={handleExitRequest} // ВЫЗЫВАЕМ НАШУ ЛОГИКУ
+              onClick={handleExitRequest}
               className="absolute -top-12 left-0 md:static md:mr-4 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all flex items-center gap-2"
               title="Сдаться"
             >
@@ -429,9 +419,8 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
                    <Latex>{problems[currentProbIndex].question}</Latex>
                  </h2>
                  
-                 {/* --- ФИКС МОБИЛЬНОЙ ВЕРСТКИ --- */}
                  <form onSubmit={handleAnswer} className="flex flex-col gap-4">
-                   <div className="flex flex-col sm:flex-row gap-3"> {/* Вертикально на мобиле, горизонтально на ПК */}
+                   <div className="flex flex-col sm:flex-row gap-3">
                      <input 
                         autoFocus
                         type="text" 
@@ -465,6 +454,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {/* ФИНИШ */}
       {status === 'finished' && (
         <div className="flex items-center justify-center h-full">
           <div className="text-center p-12 bg-slate-800 rounded-3xl border-2 border-slate-600 shadow-2xl max-w-lg w-full animate-in zoom-in-95 duration-300">
@@ -477,7 +467,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
                 {opponentDisconnected ? (
                    <p className="text-emerald-300 text-lg mb-8">Соперник сбежал с поля боя.</p>
                 ) : (
-                   <p className="text-slate-300 text-lg mb-8">Рейтинг повышен! (+25 MMR)</p>
+                   <p className="text-slate-300 text-lg mb-8">Рейтинг повышен! (+25 MP)</p>
                 )}
               </>
             ) : (
@@ -486,7 +476,7 @@ export function PvPMode({ onBack }: { onBack: () => void }) {
                 <h1 className="text-5xl font-black text-red-500 mb-4">
                   ПОРАЖЕНИЕ
                 </h1>
-                <p className="text-slate-300 text-lg mb-8">Рейтинг понижен (-25 MMR)</p>
+                <p className="text-slate-300 text-lg mb-8">Рейтинг понижен (-25 MP)</p>
               </>
             )}
             <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700 mb-8">
