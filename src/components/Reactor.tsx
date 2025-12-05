@@ -22,7 +22,7 @@ type Problem = {
   answer: string;
   type: string;
   hint?: string;
-  image_url?: string; // Поддержка картинок
+  image_url?: string;
 };
 
 type ReactorProps = {
@@ -47,7 +47,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
   const [problemsSolved, setProblemsSolved] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
 
-  // === ЛОГИКА КЛАВИАТУРЫ (Которой не хватало) ===
+  // === ФУНКЦИИ КЛАВИАТУРЫ ===
   const handleKeyInput = (symbol: string) => {
     setUserAnswer((prev) => prev + symbol);
   };
@@ -55,7 +55,6 @@ export function Reactor({ module, onBack }: ReactorProps) {
   const handleBackspace = () => {
     setUserAnswer((prev) => prev.slice(0, -1));
   };
-  // ============================================
 
   // Загрузка задач
   useEffect(() => {
@@ -99,7 +98,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
     return answer.toLowerCase().replace(/\s+/g, '').replace(',', '.');
   }
 
-async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!currentProblem || !user) return;
 
@@ -108,34 +107,35 @@ async function handleSubmit(e: React.FormEvent) {
 
     setResult(isCorrect ? 'correct' : 'incorrect');
 
-    // 1. ПРОСТО ОТПРАВЛЯЕМ ДАННЫЕ В БАЗУ
-    // Вся магия (расчет точности, начисление XP, проверка на гринд) 
-    // теперь происходит внутри SQL-триггера handle_new_experiment
+    // 1. ОТПРАВЛЯЕМ В БАЗУ
+    // SQL-триггер сам начислит XP (если не гринд) и пересчитает точность
     await supabase.from('experiments').insert({
       user_id: user.id,
       module_id: module.id,
-      problem_id: currentProblem.id, // ВАЖНО: убедись, что это поле есть в типе Problem
+      problem_id: currentProblem.id, 
       problem_type: currentProblem.type,
       correct: isCorrect,
       time_spent: timeSpent,
     });
 
-    // 2. Локальная статистика (чисто для визуала текущей сессии)
+    // 2. Локальная статистика (для красивых цифр прямо сейчас)
     setProblemsSolved(prev => prev + 1);
     if (isCorrect) {
       setCorrectCount(prev => prev + 1);
     }
 
-    // 3. Обновляем прогресс МОДУЛЯ (Это оставляем на фронте для красоты полоски)
-    const { data: progressData } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('module_id', module.id)
-      .maybeSingle();
+    // ВАЖНО: Мы убрали ручное обновление profiles (total_experiments), 
+    // потому что это теперь делает База Данных автоматически.
 
-    // Если решили правильно - добавляем прогресс, если нет - нет
+    // 3. Обновляем прогресс МОДУЛЯ (Полоска конкретной темы)
     if (isCorrect) {
+        const { data: progressData } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('module_id', module.id)
+          .maybeSingle();
+
        const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
        const newPercentage = Math.min(newExperiments * 10, 100);
 
@@ -160,6 +160,7 @@ async function handleSubmit(e: React.FormEvent) {
     }, 2000);
   }
 
+  // Расчет локального КПД для отображения
   const successRate = problemsSolved > 0 ? ((correctCount / problemsSolved) * 100).toFixed(0) : 0;
 
   if (loading) {
@@ -206,7 +207,7 @@ async function handleSubmit(e: React.FormEvent) {
             <div className="text-2xl font-bold text-white">{correctCount}</div>
           </div>
           <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4">
-            <div className="text-purple-400/60 text-sm mb-1">КПД</div>
+            <div className="text-purple-400/60 text-sm mb-1">КПД (Сессия)</div>
             <div className="text-2xl font-bold text-white">{successRate}%</div>
           </div>
         </div>
@@ -221,7 +222,6 @@ async function handleSubmit(e: React.FormEvent) {
             </div>
 
             <div className="mb-8 relative z-10">
-              {/* Если есть картинка - показываем */}
               {currentProblem.image_url && (
                 <div className="mb-6 flex justify-center">
                   <img 
@@ -253,7 +253,6 @@ async function handleSubmit(e: React.FormEvent) {
                   />
                 </div>
 
-                {/* ВСТАВЛЯЕМ КЛАВИАТУРУ */}
                 <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
 
                 {showHint && currentProblem.hint && (
