@@ -5,6 +5,7 @@ import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer, WifiOff, ArrowLeft, Flag, AlertTriangle } from 'lucide-react';
 import { getPvPRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
+import { checkAnswer } from '../lib/mathUtils';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
 
