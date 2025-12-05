@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import QRCode from 'react-qr-code';
-import { Users, Play, Trophy, Share2, X, Crown, Copy } from 'lucide-react';
+import { Users, Play, Trophy, Share2, X, Crown, Copy, Loader } from 'lucide-react';
 
 export function TournamentAdmin({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
