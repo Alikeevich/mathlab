@@ -272,15 +272,19 @@ function MainApp() {
       {profile?.companion_name && (
         <button 
           onClick={() => setShowCompanion(true)}
-          className="relative group p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all mr-2"
+          className="relative group p-1 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all mr-2 overflow-hidden"
           title={`Домик ${profile.companion_name}`}
         >
-          <span className="text-xl filter drop-shadow-md group-hover:scale-110 block transition-transform">
-            🦦
-          </span>
-          {/* Индикатор голода (красная точка) */}
+          {/* Картинка вместо эмодзи */}
+          <img 
+            src="/meerkat/avatar.png" 
+            alt="Pet" 
+            className="w-8 h-8 object-cover mix-blend-screen group-hover:scale-110 transition-transform"
+          />
+          
+          {/* Индикатор голода */}
           {profile.companion_hunger < 30 && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
           )}
         </button>
       )}
