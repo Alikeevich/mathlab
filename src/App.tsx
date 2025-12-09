@@ -6,7 +6,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// Добавили Keyboard и Ticket для кнопки
+import { CompanionSetup } from './components/CompanionSetup';
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -35,7 +35,8 @@ function MainApp() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showTournamentAdmin, setShowTournamentAdmin] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [showJoinCode, setShowJoinCode] = useState(false); // <--- Новая модалка
+  const [showJoinCode, setShowJoinCode] = useState(false);
+  const [showCompanionSetup, setShowCompanionSetup] = useState(false);
 
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
@@ -68,6 +69,26 @@ function MainApp() {
       alert("Турнир с таким кодом не найден!");
     }
   }
+
+  useEffect(() => {
+    if (!profile) return;
+  
+    // 1. Проверка первого входа (Обычный онбординг)
+    if (profile.total_experiments === 0 && profile.clearance_level === 0) {
+      const hasSeen = localStorage.getItem('onboarding_seen');
+      if (!hasSeen) {
+        setShowOnboarding(true);
+        return; // Прерываем, чтобы окна не наслоились
+      }
+    }
+  
+    // 2. Проверка Суриката (Если онбординг пройден, но имени нет)
+    // profile.companion_name будет null, если еще не выбрали
+    if (!profile.companion_name) {
+      setShowCompanionSetup(true);
+    }
+  
+  }, [profile, showOnboarding]);
 
   // Проверка URL при загрузке
   useEffect(() => {
@@ -238,6 +259,7 @@ function MainApp() {
         )}
       </main>
 
+      {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
       {showOnboarding && <Onboarding onComplete={finishOnboarding} />}
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
