@@ -93,20 +93,16 @@ export function CompanionLair({ onClose }: Props) {
           {/* ПЕРСОНАЖ */}
           <div className="relative z-10 transition-all duration-500 transform hover:scale-105 cursor-pointer" onClick={() => setAnimationState('happy')}>
              {/* Замени <div> на <img> когда будут файлы */}
-               <img src={animationState === 'idle' 
-                     ? "/meerkat/idle.png" 
-                     : "/meerkat/firsttime.gif" // Пока нет анимации еды/счастья, используем гифку радости
-                 }
-                 alt="Сурикат"
-                 // mix-blend-screen убирает черный фон
-                 className={`w-64 h-64 object-contain ${
-                   animationState === 'eating' ? 'animate-bounce' : ''
-                 }`} 
-               />
-             </div>
-             
-             {/* Если у тебя спрайт на черном фоне, раскомментируй это: */}
-             {/* <img src={getSprite()} className="w-48 h-48 object-contain mix-blend-screen" /> */}
+              <img src={animationState === 'idle' 
+                  ? "/meerkat/idle.png" 
+                  : "/meerkat/firsttime.gif" // Пока нет анимации еды/счастья, используем гифку радости
+              }
+              alt="Сурикат"
+              // mix-blend-screen убирает черный фон
+              className={`w-64 h-64 object-contain ${
+                animationState === 'eating' ? 'animate-bounce' : ''
+              }`} 
+            />
           </div>
 
           {/* Облачко с мыслями (если голоден) */}
