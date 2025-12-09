@@ -95,7 +95,7 @@ export function CompanionLair({ onClose }: Props) {
              {/* Замени <div> на <img> когда будут файлы */}
               <img src={animationState === 'idle' 
                   ? "/meerkat/idle.png" 
-                  : "/meerkat/firsttime.gif" // Пока нет анимации еды/счастья, используем гифку радости
+                  : "/meerkat/happy.mp4" // Пока нет анимации еды/счастья, используем гифку радости
               }
               alt="Сурикат"
               // mix-blend-screen убирает черный фон
