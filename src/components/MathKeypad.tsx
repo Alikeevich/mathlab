@@ -25,7 +25,7 @@ export function MathKeypad({ onKeyPress, onBackspace }: MathKeypadProps) {
       {keys.map((key) => (
         <button
           key={key.label}
-          type="button" // Важно: чтобы не отправлялась форма при клике
+          type="button" // чтобы не отправлялась форма при клике
           onClick={() => onKeyPress(key.value)}
           className="bg-slate-700/50 hover:bg-slate-600 border border-slate-600 hover:border-cyan-500/50 text-cyan-300 font-mono text-lg font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center"
         >
@@ -33,7 +33,6 @@ export function MathKeypad({ onKeyPress, onBackspace }: MathKeypadProps) {
         </button>
       ))}
       
-      {/* Кнопка стирания (теперь занимает 1 клетку, чтобы сетка была ровной 6x2) */}
       <button
         type="button"
         onClick={onBackspace}
