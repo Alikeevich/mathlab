@@ -38,7 +38,7 @@ export function CompanionLair({ onClose }: Props) {
 
     // Таймеры стали намного короче:
     setTimeout(() => setAnimationState('happy'), 500); // Через 0.5 сек радуется
-    setTimeout(() => setAnimationState('idle'), 1500); // Через 1.5 сек (суммарно) успокаивается
+    setTimeout(() => setAnimationState('idle'), 2000); // Через 1.5 сек (суммарно) успокаивается
     
     refreshProfile();
   };
