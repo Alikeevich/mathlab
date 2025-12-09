@@ -10,43 +10,74 @@ type Props = {
 export function CompanionLair({ onClose }: Props) {
   const { profile, refreshProfile } = useAuth();
   const [animationState, setAnimationState] = useState<'idle' | 'eating' | 'happy'>('idle');
-  const [hunger, setHunger] = useState(100);
   
+  // Локальное состояние голода для плавности
+  const [hunger, setHunger] = useState(profile?.companion_hunger || 100);
+  
+  // === АВТО-СИНХРОНИЗАЦИЯ ГОЛОДА ===
   useEffect(() => {
-    if (profile?.last_fed_at) {
-      const lastFed = new Date(profile.last_fed_at).getTime();
+    async function syncHunger() {
+      if (!profile) return;
+
+      const lastFed = profile.last_fed_at ? new Date(profile.last_fed_at).getTime() : Date.now();
       const now = Date.now();
-      const hoursPassed = (now - lastFed) / (1000 * 60 * 60);
-      const currentHunger = Math.max(0, 100 - Math.floor(hoursPassed * 5));
-      setHunger(currentHunger);
+      // Сколько часов прошло (для теста можно умножить на 60, чтобы голодал за минуты)
+      const hoursPassed = (now - lastFed) / (1000 * 60 * 60); 
+      
+      // Формула: -5 сытости в час
+      // Если прошло 2 часа -> 100 - 10 = 90
+      let calculatedHunger = Math.max(0, 100 - Math.floor(hoursPassed * 5));
+
+      // Если в базе значение неактуальное (например там 100, а реально 90)
+      // Мы обновляем базу, чтобы везде было синхронно
+      if (calculatedHunger !== profile.companion_hunger) {
+        // Обновляем локально
+        setHunger(calculatedHunger);
+        
+        // Обновляем в базе (тихо)
+        await supabase.from('profiles').update({ 
+          companion_hunger: calculatedHunger 
+        }).eq('id', profile.id);
+        
+        // Обновляем контекст приложения
+        refreshProfile();
+      } else {
+        setHunger(profile.companion_hunger);
+      }
     }
-  }, [profile]);
+
+    syncHunger();
+    
+    // Запускаем таймер, чтобы голод падал прямо на глазах, если долго сидеть в меню
+    const interval = setInterval(syncHunger, 60000); // Каждую минуту проверка
+    return () => clearInterval(interval);
+  }, [profile?.last_fed_at]); // Зависим от времени кормления
 
   // ФУНКЦИЯ КОРМЛЕНИЯ
   const feedCompanion = async () => {
     if (hunger >= 100) return;
     
-    setAnimationState('eating'); // Начинает есть
+    setAnimationState('eating');
     
+    // +20 к сытости, но не больше 100
     const newHunger = Math.min(100, hunger + 20);
     setHunger(newHunger);
 
+    // ВАЖНО: Обновляем и сытость, и ВРЕМЯ ПОСЛЕДНЕГО КОРМЛЕНИЯ
     await supabase.from('profiles').update({ 
       companion_hunger: newHunger,
       last_fed_at: new Date().toISOString()
     }).eq('id', profile!.id);
 
-    // Таймеры стали намного короче:
-    setTimeout(() => setAnimationState('happy'), 500); // Через 0.5 сек радуется
-    setTimeout(() => setAnimationState('idle'), 2000); // Через 1.5 сек (суммарно) успокаивается
+    setTimeout(() => setAnimationState('happy'), 500);
+    setTimeout(() => setAnimationState('idle'), 1500);
     
     refreshProfile();
   };
 
-  // ФУНКЦИЯ ПОГЛАЖИВАНИЯ (КЛИК ПО ПЕРСОНАЖУ)
+  // ФУНКЦИЯ ПОГЛАЖИВАНИЯ
   const handlePet = () => {
     setAnimationState('happy');
-    // Автоматически убираем радость через 1 секунду
     setTimeout(() => setAnimationState('idle'), 1000);
   };
 
@@ -65,7 +96,7 @@ export function CompanionLair({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[80] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
       <div className="w-full max-w-lg bg-gradient-to-b from-slate-800 to-slate-900 border border-amber-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
         
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
@@ -90,7 +121,7 @@ export function CompanionLair({ onClose }: Props) {
           {/* ПЕРСОНАЖ */}
           <div 
              className={`relative z-10 transition-all duration-300 cursor-pointer ${getAnimationClass()}`}
-             onClick={handlePet} // Используем новую функцию с авто-сбросом
+             onClick={handlePet}
           >
              <img 
                src={getSprite()} 
