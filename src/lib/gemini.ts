@@ -33,7 +33,7 @@ export async function askMeerkat(
   problemContext: string
 ) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const chat = model.startChat({
       history: [
