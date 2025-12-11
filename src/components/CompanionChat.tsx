@@ -26,7 +26,6 @@ const QUICK_QUESTIONS = [
   "В чем тут подвох?"
 ];
 
-// ВАЖНО: ТУТ ДОЛЖНО БЫТЬ "export function", А НЕ ПРОСТО "function"
 export function CompanionChat({ onClose, problemContext }: Props) {
   const { profile } = useAuth();
   const companionName = profile?.companion_name || 'Сурикат';
@@ -38,6 +37,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
   const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Автоскролл вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isThinking]);
@@ -65,25 +65,28 @@ export function CompanionChat({ onClose, problemContext }: Props) {
     setInput('');
   };
 
+  // Выбор картинки (Думает или Обычный)
   const getSprite = () => {
     if (isThinking) return '/meerkat/thinking.png';
     return '/meerkat/idle.png';
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
-      <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-4xl h-[80vh] sm:rounded-3xl shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+    <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
+      <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-5xl h-[85vh] md:h-[80vh] md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
         
-        {/* ЛЕВАЯ ЧАСТЬ: ЧАТ */}
-        <div className="flex-1 flex flex-col h-full bg-slate-900/50">
-          <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+        {/* === ЛЕВАЯ ЧАСТЬ: ЧАТ === */}
+        <div className="flex-1 flex flex-col h-full bg-slate-900/50 min-w-0">
+          
+          {/* Шапка */}
+          <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/30">
                 <Sparkles className="w-5 h-5 text-amber-400" />
               </div>
               <div>
                 <h3 className="font-bold text-white text-lg">{companionName}</h3>
-                <p className="text-xs text-cyan-400">ИИ-Ассистент Лаборатории</p>
+                <p className="text-xs text-cyan-400">Компаньон Лаборатории</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
@@ -91,16 +94,18 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             </button>
           </div>
 
+          {/* Список сообщений */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'me' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed ${
+                <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
                   msg.role === 'me' 
                     ? 'bg-cyan-600 text-white rounded-br-none' 
                     : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none'
                 }`}>
+                  {/* Рендер текста + формул */}
                   {msg.parts.split('\n').map((line, i) => (
-                    <p key={i} className="mb-1 min-h-[1.2em]">
+                    <p key={i} className="mb-1 min-h-[1em]">
                       <Latex>{line}</Latex>
                     </p>
                   ))}
@@ -108,6 +113,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
               </div>
             ))}
             
+            {/* Анимация "Печатает..." */}
             {isThinking && (
               <div className="flex justify-start">
                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 rounded-bl-none flex gap-2 items-center">
@@ -120,8 +126,8 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ */}
-          <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide bg-slate-900/80 border-t border-slate-800">
+          {/* Панель быстрых вопросов (Чипы) */}
+          <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide bg-slate-900/90 border-t border-slate-800 shrink-0">
              {QUICK_QUESTIONS.map((q, i) => (
                <button
                  key={i}
@@ -134,7 +140,8 @@ export function CompanionChat({ onClose, problemContext }: Props) {
              ))}
           </div>
 
-          <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800">
+          {/* Форма ввода */}
+          <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800 shrink-0">
             <div className="flex gap-2">
               <input 
                 type="text" 
@@ -155,18 +162,26 @@ export function CompanionChat({ onClose, problemContext }: Props) {
           </form>
         </div>
 
-        {/* ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА */}
-        <div className="hidden md:flex w-72 bg-gradient-to-b from-slate-800 to-slate-900 border-l border-slate-700 flex-col items-center justify-end relative overflow-hidden">
+        {/* === ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА (На мобильных скрыт) === */}
+        <div className="hidden md:flex w-80 bg-gradient-to-b from-slate-800 to-slate-900 border-l border-slate-700 flex-col items-center justify-end relative overflow-hidden shrink-0">
+          
+          {/* Фон */}
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.2),transparent_70%)]" />
           
-          <img 
-            src={getSprite()} 
-            alt="Companion" 
-            className={`w-64 h-64 object-contain z-10 mb-[-20px] transition-all duration-300 ${isThinking ? 'animate-pulse scale-105' : 'hover:scale-105'}`}
-          />
+          {/* СУРИКАТ */}
+          <div className={`relative z-10 mb-[-20px] transition-all duration-300 ${isThinking ? 'scale-105' : 'hover:scale-105'}`}>
+             <img 
+               src={getSprite()} 
+               alt="Companion" 
+               className="w-72 h-72 object-contain mix-blend-screen"
+               // Если нет thinking.png, ставим idle.png
+               onError={(e) => { e.currentTarget.src='/meerkat/idle.png'; }}
+             />
+          </div>
           
+          {/* Облачко с мыслями (Только когда думает) */}
           {isThinking && (
-            <div className="absolute top-10 right-4 bg-white text-black text-xs font-bold px-3 py-2 rounded-xl rounded-bl-none animate-bounce shadow-lg z-20 max-w-[150px]">
+            <div className="absolute top-12 right-6 bg-white text-black text-xs font-bold px-4 py-3 rounded-2xl rounded-bl-none animate-bounce shadow-xl z-20 max-w-[160px] border-2 border-cyan-500">
               Хм-м, дай подумать... 🤔
             </div>
           )}
