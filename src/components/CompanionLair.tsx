@@ -10,60 +10,58 @@ type Props = {
 export function CompanionLair({ onClose }: Props) {
   const { profile, refreshProfile } = useAuth();
   const [animationState, setAnimationState] = useState<'idle' | 'eating' | 'happy'>('idle');
-  
-  // Локальное состояние голода для плавности
   const [hunger, setHunger] = useState(profile?.companion_hunger || 100);
   
-  // === АВТО-СИНХРОНИЗАЦИЯ ГОЛОДА ===
+  // === 1. УМНАЯ СИНХРОНИЗАЦИЯ ===
   useEffect(() => {
     async function syncHunger() {
       if (!profile) return;
 
-      const lastFed = profile.last_fed_at ? new Date(profile.last_fed_at).getTime() : Date.now();
+      const lastUpdate = profile.last_fed_at ? new Date(profile.last_fed_at).getTime() : Date.now();
       const now = Date.now();
-      // Сколько часов прошло (для теста можно умножить на 60, чтобы голодал за минуты)
-      const hoursPassed = (now - lastFed) / (1000 * 60 * 60); 
       
-      // Формула: -5 сытости в час
-      // Если прошло 2 часа -> 100 - 10 = 90
-      let calculatedHunger = Math.max(0, 100 - Math.floor(hoursPassed * 5));
+      // Сколько часов прошло с последнего сохранения/кормления
+      // (Используем минуты для наглядности, если хочешь быстрее - дели на 1000 * 60)
+      const hoursPassed = (now - lastUpdate) / (1000 * 60 * 60);
+      
+      // Потеря голода: 5 единиц в час
+      const hungerLoss = Math.floor(hoursPassed * 5);
 
-      // Если в базе значение неактуальное (например там 100, а реально 90)
-      // Мы обновляем базу, чтобы везде было синхронно
-      if (calculatedHunger !== profile.companion_hunger) {
-        // Обновляем локально
-        setHunger(calculatedHunger);
+      if (hungerLoss > 0) {
+        // Отнимаем от ТЕКУЩЕГО значения в базе, а не от 100!
+        // Это позволяет тебе менять значение в базе вручную, и оно не сбросится
+        const newHunger = Math.max(0, (profile.companion_hunger || 100) - hungerLoss);
+
+        setHunger(newHunger);
         
-        // Обновляем в базе (тихо)
+        // Обновляем базу: записываем новый голод и ТЕКУЩЕЕ ВРЕМЯ
+        // Теперь время будет точкой отсчета для следующего падения
         await supabase.from('profiles').update({ 
-          companion_hunger: calculatedHunger 
+          companion_hunger: newHunger,
+          last_fed_at: new Date().toISOString()
         }).eq('id', profile.id);
         
-        // Обновляем контекст приложения
         refreshProfile();
       } else {
+        // Если времени прошло мало, просто показываем то, что в базе
         setHunger(profile.companion_hunger);
       }
     }
 
     syncHunger();
-    
-    // Запускаем таймер, чтобы голод падал прямо на глазах, если долго сидеть в меню
-    const interval = setInterval(syncHunger, 60000); // Каждую минуту проверка
-    return () => clearInterval(interval);
-  }, [profile?.last_fed_at]); // Зависим от времени кормления
+  }, []); // Запускаем только при открытии окна
 
-  // ФУНКЦИЯ КОРМЛЕНИЯ
+  // === 2. ФУНКЦИЯ КОРМЛЕНИЯ ===
   const feedCompanion = async () => {
     if (hunger >= 100) return;
     
     setAnimationState('eating');
     
-    // +20 к сытости, но не больше 100
+    // Прибавляем 20 к ТЕКУЩЕМУ, но не больше 100
     const newHunger = Math.min(100, hunger + 20);
     setHunger(newHunger);
 
-    // ВАЖНО: Обновляем и сытость, и ВРЕМЯ ПОСЛЕДНЕГО КОРМЛЕНИЯ
+    // Сохраняем и обновляем таймер (чтобы голод начал падать заново от этого момента)
     await supabase.from('profiles').update({ 
       companion_hunger: newHunger,
       last_fed_at: new Date().toISOString()
@@ -75,7 +73,6 @@ export function CompanionLair({ onClose }: Props) {
     refreshProfile();
   };
 
-  // ФУНКЦИЯ ПОГЛАЖИВАНИЯ
   const handlePet = () => {
     setAnimationState('happy');
     setTimeout(() => setAnimationState('idle'), 1000);
@@ -90,13 +87,14 @@ export function CompanionLair({ onClose }: Props) {
 
   const getAnimationClass = () => {
     switch (animationState) {
-      case 'eating': return 'scale-105'; // Просто чуть увеличивается, БЕЗ ПРЫЖКОВ
+      case 'eating': return 'scale-105';
+      case 'happy': return 'animate-pulse scale-110';
       default: return hunger < 30 ? 'animate-pulse opacity-80' : 'hover:scale-105 transition-transform';
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[80] flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-gradient-to-b from-slate-800 to-slate-900 border border-amber-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
         
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
@@ -115,10 +113,8 @@ export function CompanionLair({ onClose }: Props) {
 
         {/* Сцена */}
         <div className="relative h-72 bg-slate-950/50 rounded-2xl border-2 border-slate-700 flex items-center justify-center mb-6 overflow-hidden">
-          
           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]" />
 
-          {/* ПЕРСОНАЖ */}
           <div 
              className={`relative z-10 transition-all duration-300 cursor-pointer ${getAnimationClass()}`}
              onClick={handlePet}
