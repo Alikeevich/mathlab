@@ -1,183 +1,174 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useRef } from 'react';
+import { askMeerkat } from '../lib/gemini';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Utensils, Zap, Sparkles } from 'lucide-react';
+import { X, Send, Sparkles } from 'lucide-react';
+// ИМПОРТЫ ДЛЯ МАТЕМАТИКИ
+import Latex from 'react-latex-next';
+import 'katex/dist/katex.min.css';
 
 type Props = {
   onClose: () => void;
+  problemContext: string;
 };
 
-export function CompanionLair({ onClose }: Props) {
-  const { profile, refreshProfile } = useAuth();
-  const [animationState, setAnimationState] = useState<'idle' | 'eating' | 'happy'>('idle');
-  const [hunger, setHunger] = useState(profile?.companion_hunger || 100);
+type Message = {
+  id: string;
+  role: 'me' | 'meerkat';
+  parts: string;
+};
+
+// БЫСТРЫЕ ВОПРОСЫ
+const QUICK_QUESTIONS = [
+  "Как решить эту задачу?",
+  "Дай подсказку, но не ответ",
+  "Какую формулу использовать?",
+  "Объясни проще, для чайников",
+  "В чем тут подвох?"
+];
+
+export function CompanionChat({ onClose, problemContext }: Props) {
+  const { profile } = useAuth();
+  const companionName = profile?.companion_name || 'Сурикат';
   
-  // === 1. УМНАЯ СИНХРОНИЗАЦИЯ ===
+  const [messages, setMessages] = useState<Message[]>([
+    { id: '1', role: 'meerkat', parts: `Привет, коллега! Застрял на этой задаче? Давай разберем её вместе. Что именно непонятно?` }
+  ]);
+  const [input, setInput] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    async function syncHunger() {
-      if (!profile) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isThinking]);
 
-      const lastUpdate = profile.last_fed_at ? new Date(profile.last_fed_at).getTime() : Date.now();
-      const now = Date.now();
-      
-      // Сколько часов прошло с последнего сохранения/кормления
-      // (Используем минуты для наглядности, если хочешь быстрее - дели на 1000 * 60)
-      const hoursPassed = (now - lastUpdate) / (1000 * 60 * 60);
-      
-      // Потеря голода: 5 единиц в час
-      const hungerLoss = Math.floor(hoursPassed * 5);
+  // УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОТПРАВКИ
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isThinking) return;
 
-      if (hungerLoss > 0) {
-        // Отнимаем от ТЕКУЩЕГО значения в базе, а не от 100!
-        // Это позволяет тебе менять значение в базе вручную, и оно не сбросится
-        const newHunger = Math.max(0, (profile.companion_hunger || 100) - hungerLoss);
+    // 1. Добавляем сообщение юзера
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'me', parts: text }]);
+    setIsThinking(true);
 
-        setHunger(newHunger);
-        
-        // Обновляем базу: записываем новый голод и ТЕКУЩЕЕ ВРЕМЯ
-        // Теперь время будет точкой отсчета для следующего падения
-        await supabase.from('profiles').update({ 
-          companion_hunger: newHunger,
-          last_fed_at: new Date().toISOString()
-        }).eq('id', profile.id);
-        
-        refreshProfile();
-      } else {
-        // Если времени прошло мало, просто показываем то, что в базе
-        setHunger(profile.companion_hunger);
-      }
-    }
+    // 2. Запрос к Gemini
+    const answer = await askMeerkat(messages, text, companionName, problemContext);
 
-    syncHunger();
-  }, []); // Запускаем только при открытии окна
-
-  // === 2. ФУНКЦИЯ КОРМЛЕНИЯ ===
-  const feedCompanion = async () => {
-    if (hunger >= 100) return;
+    setIsThinking(false);
     
-    setAnimationState('eating');
-    
-    // Прибавляем 20 к ТЕКУЩЕМУ, но не больше 100
-    const newHunger = Math.min(100, hunger + 20);
-    setHunger(newHunger);
-
-    // Сохраняем и обновляем таймер (чтобы голод начал падать заново от этого момента)
-    await supabase.from('profiles').update({ 
-      companion_hunger: newHunger,
-      last_fed_at: new Date().toISOString()
-    }).eq('id', profile!.id);
-
-    setTimeout(() => setAnimationState('happy'), 500);
-    setTimeout(() => setAnimationState('idle'), 1500);
-    
-    refreshProfile();
+    // 3. Добавляем ответ суриката
+    setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'meerkat', parts: answer }]);
   };
 
-  const handlePet = () => {
-    setAnimationState('happy');
-    setTimeout(() => setAnimationState('idle'), 1000);
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input);
+    setInput('');
   };
 
   const getSprite = () => {
-    if (animationState === 'eating') return '/meerkat/eating.png';
-    if (animationState === 'happy') return '/meerkat/happy.png';
-    if (hunger < 30) return '/meerkat/crying.png';
+    if (isThinking) return '/meerkat/thinking.png';
     return '/meerkat/idle.png';
   };
 
-  const getAnimationClass = () => {
-    switch (animationState) {
-      case 'eating': return 'scale-105';
-      case 'happy': return 'animate-pulse scale-110';
-      default: return hunger < 30 ? 'animate-pulse opacity-80' : 'hover:scale-105 transition-transform';
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[80] flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-gradient-to-b from-slate-800 to-slate-900 border border-amber-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-4xl h-[80vh] sm:rounded-3xl shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
         
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
-          <X className="w-6 h-6" />
-        </button>
-
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
-            Домик {profile?.companion_name}
-            <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-          </h2>
-          <div className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-1">
-            Уровень {profile?.companion_level} • XP {profile?.companion_xp}/100
+        {/* ЛЕВАЯ ЧАСТЬ: ЧАТ */}
+        <div className="flex-1 flex flex-col h-full bg-slate-900/50">
+          <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/30">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-lg">{companionName}</h3>
+                <p className="text-xs text-cyan-400">ИИ-Ассистент Лаборатории</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
+              <X className="w-6 h-6" />
+            </button>
           </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'me' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed ${
+                  msg.role === 'me' 
+                    ? 'bg-cyan-600 text-white rounded-br-none' 
+                    : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none'
+                }`}>
+                  {msg.parts.split('\n').map((line, i) => (
+                    <p key={i} className="mb-1 min-h-[1.2em]">
+                      <Latex>{line}</Latex>
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+            
+            {isThinking && (
+              <div className="flex justify-start">
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 rounded-bl-none flex gap-2 items-center">
+                  <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                  <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ (Горизонтальный скролл) */}
+          <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide bg-slate-900/80 border-t border-slate-800">
+             {QUICK_QUESTIONS.map((q, i) => (
+               <button
+                 key={i}
+                 onClick={() => sendMessage(q)}
+                 disabled={isThinking}
+                 className="whitespace-nowrap px-3 py-1.5 bg-slate-800 border border-cyan-500/30 rounded-full text-xs text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-400 transition-all disabled:opacity-50 active:scale-95"
+               >
+                 {q}
+               </button>
+             ))}
+          </div>
+
+          <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800">
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Напиши вопрос..."
+                className="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 transition-colors"
+                autoFocus
+              />
+              <button 
+                type="submit" 
+                disabled={!input.trim() || isThinking}
+                className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white p-3 rounded-xl transition-colors"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
         </div>
 
-        {/* Сцена */}
-        <div className="relative h-72 bg-slate-950/50 rounded-2xl border-2 border-slate-700 flex items-center justify-center mb-6 overflow-hidden">
-          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]" />
-
-          <div 
-             className={`relative z-10 transition-all duration-300 cursor-pointer ${getAnimationClass()}`}
-             onClick={handlePet}
-          >
-             <img 
-               src={getSprite()} 
-               alt="Сурикат" 
-               className="w-56 h-56 object-contain drop-shadow-2xl" 
-             />
-          </div>
-
-          {hunger < 30 && (
-            <div className="absolute top-4 right-10 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-xl animate-bounce shadow-lg">
-              Покорми меня! 🍖
+        {/* ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА */}
+        <div className="hidden md:flex w-72 bg-gradient-to-b from-slate-800 to-slate-900 border-l border-slate-700 flex-col items-center justify-end relative overflow-hidden">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.2),transparent_70%)]" />
+          
+          <img 
+            src={getSprite()} 
+            alt="Companion" 
+            className={`w-64 h-64 object-contain z-10 mb-[-20px] transition-all duration-300 ${isThinking ? 'animate-pulse scale-105' : 'hover:scale-105'}`}
+          />
+          
+          {isThinking && (
+            <div className="absolute top-10 right-4 bg-white text-black text-xs font-bold px-3 py-2 rounded-xl rounded-bl-none animate-bounce shadow-lg z-20 max-w-[150px]">
+              Хм-м, дай подумать... 🤔
             </div>
           )}
-        </div>
-
-        {/* Показатели */}
-        <div className="space-y-4 mb-8">
-          <div>
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span className="flex items-center gap-1"><Utensils className="w-3 h-3" /> Сытость</span>
-              <span>{hunger}%</span>
-            </div>
-            <div className="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-              <div 
-                className={`h-full transition-all duration-500 ${hunger < 30 ? 'bg-red-500' : 'bg-green-500'}`} 
-                style={{ width: `${hunger}%` }} 
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Энергия роста</span>
-              <span>{profile?.companion_xp}%</span>
-            </div>
-            <div className="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-              <div 
-                className="h-full bg-amber-400 transition-all duration-500 shadow-[0_0_10px_rgba(251,191,36,0.5)]" 
-                style={{ width: `${profile?.companion_xp || 0}%` }} 
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={feedCompanion}
-            disabled={hunger >= 100}
-            className="py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Utensils className="w-5 h-5 text-orange-400" />
-            Покормить
-          </button>
-          
-          <button 
-            className="py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all opacity-50 cursor-not-allowed"
-          >
-            <div className="text-xl">👕</div>
-            Нарядить
-          </button>
         </div>
 
       </div>
