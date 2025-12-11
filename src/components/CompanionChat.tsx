@@ -86,7 +86,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
               </div>
               <div>
                 <h3 className="font-bold text-white text-lg">{companionName}</h3>
-                <p className="text-xs text-cyan-400">ИИ-Ассистент Лаборатории</p>
+                <p className="text-xs text-cyan-400">Компаньон Лаборатории</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
