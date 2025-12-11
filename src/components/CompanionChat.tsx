@@ -46,16 +46,12 @@ export function CompanionChat({ onClose, problemContext }: Props) {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isThinking) return;
 
-    // 1. Добавляем сообщение юзера
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'me', parts: text }]);
     setIsThinking(true);
 
-    // 2. Запрос к Gemini
     const answer = await askMeerkat(messages, text, companionName, problemContext);
 
     setIsThinking(false);
-    
-    // 3. Добавляем ответ суриката
     setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'meerkat', parts: answer }]);
   };
 
@@ -73,10 +69,10 @@ export function CompanionChat({ onClose, problemContext }: Props) {
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
-      <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-5xl h-[85vh] md:h-[80vh] md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+      <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-5xl h-[90vh] md:h-[80vh] md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 relative">
         
         {/* === ЛЕВАЯ ЧАСТЬ: ЧАТ === */}
-        <div className="flex-1 flex flex-col h-full bg-slate-900/50 min-w-0">
+        <div className="flex-1 flex flex-col h-full bg-slate-900/50 min-w-0 z-10 relative">
           
           {/* Шапка */}
           <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 shrink-0">
@@ -86,7 +82,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
               </div>
               <div>
                 <h3 className="font-bold text-white text-lg">{companionName}</h3>
-                <p className="text-xs text-cyan-400">Компаньон Лаборатории</p>
+                <p className="text-xs text-cyan-400">ИИ-Ассистент Лаборатории</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
@@ -101,7 +97,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
                 <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
                   msg.role === 'me' 
                     ? 'bg-cyan-600 text-white rounded-br-none' 
-                    : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none'
+                    : 'bg-slate-700 text-white border border-slate-600 rounded-bl-none' // <--- ИЗМЕНЕНО: Светлее фон и белый текст
                 }`}>
                   {/* Рендер текста + формул */}
                   {msg.parts.split('\n').map((line, i) => (
@@ -116,7 +112,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             {/* Анимация "Печатает..." */}
             {isThinking && (
               <div className="flex justify-start">
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 rounded-bl-none flex gap-2 items-center">
+                <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 rounded-bl-none flex gap-2 items-center backdrop-blur-sm">
                   <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
                   <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
@@ -126,8 +122,8 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ (Горизонтальный скролл) */}
-          <div className="border-t border-slate-800 bg-slate-900/90 backdrop-blur-sm">
+          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ (Исправленный скролл) */}
+          <div className="border-t border-slate-800 bg-slate-900/90 backdrop-blur-sm shrink-0 z-20">
              <div className="flex gap-2 overflow-x-auto scrollbar-hide py-3 px-4 w-full touch-pan-x">
                {QUICK_QUESTIONS.map((q, i) => (
                  <button
@@ -139,13 +135,12 @@ export function CompanionChat({ onClose, problemContext }: Props) {
                    {q}
                  </button>
                ))}
-               {/* Пустой блок в конце, чтобы последняя кнопка не прилипала к краю на мобильных */}
-               <div className="w-2 flex-shrink-0" />
+               <div className="w-8 flex-shrink-0" /> {/* Отступ справа */}
              </div>
           </div>
 
           {/* Форма ввода */}
-          <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800 shrink-0">
+          <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800 shrink-0 z-20">
             <div className="flex gap-2">
               <input 
                 type="text" 
@@ -166,27 +161,34 @@ export function CompanionChat({ onClose, problemContext }: Props) {
           </form>
         </div>
 
-        {/* === ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА (На мобильных скрыт) === */}
-        <div className="hidden md:flex w-80 bg-gradient-to-b from-slate-800 to-slate-900 border-l border-slate-700 flex-col items-center justify-end relative overflow-hidden shrink-0">
+        {/* === ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА (Адаптивный) === */}
+        <div className={`
+            /* MOBILE STYLES: Абсолютно поверх, справа внизу (над кнопками), прозрачный, пропускает клики */
+            absolute bottom-[140px] right-[-20px] w-40 h-40 z-0 pointer-events-none opacity-100
+            
+            /* DESKTOP STYLES: Статичная колонка справа */
+            md:static md:w-80 md:h-full md:opacity-100 md:bg-gradient-to-b md:from-slate-800 md:to-slate-900 md:border-l md:border-slate-700
+            
+            flex flex-col items-center justify-end overflow-hidden shrink-0 transition-all duration-300
+        `}>
           
-          {/* Фон */}
-          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.2),transparent_70%)]" />
+          {/* Фон (Только на десктопе виден нормально) */}
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.2),transparent_70%)] hidden md:block" />
           
           {/* СУРИКАТ */}
-          <div className={`relative z-10 mb-[-20px] transition-all duration-300 ${isThinking ? 'scale-105' : 'hover:scale-105'}`}>
+          <div className={`relative z-10 mb-[-10px] md:mb-[-20px] transition-all duration-300 ${isThinking ? 'scale-105' : 'hover:scale-105'}`}>
              <img 
                src={getSprite()} 
                alt="Companion" 
-               className="w-72 h-72 object-contain mix-blend-screen"
-               // Если нет thinking.png, ставим idle.png
+               className="w-40 h-40 md:w-72 md:h-72 object-contain mix-blend-screen drop-shadow-2xl"
                onError={(e) => { e.currentTarget.src='/meerkat/idle.png'; }}
              />
           </div>
           
-          {/* Облачко с мыслями (Только когда думает) */}
+          {/* Облачко с мыслями (Адаптивное позиционирование) */}
           {isThinking && (
-            <div className="absolute top-12 right-6 bg-white text-black text-xs font-bold px-4 py-3 rounded-2xl rounded-bl-none animate-bounce shadow-xl z-20 max-w-[160px] border-2 border-cyan-500">
-              Хм-м, дай подумать... 🤔
+            <div className="absolute top-0 right-10 md:top-12 md:right-6 bg-white text-black text-xs font-bold px-3 py-2 rounded-2xl rounded-bl-none animate-bounce shadow-xl z-20 max-w-[120px] md:max-w-[160px] border-2 border-cyan-500">
+              Хм-м... 🤔
             </div>
           )}
         </div>
