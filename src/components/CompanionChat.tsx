@@ -126,18 +126,22 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Панель быстрых вопросов (Чипы) */}
-          <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide bg-slate-900/90 border-t border-slate-800 shrink-0">
-             {QUICK_QUESTIONS.map((q, i) => (
-               <button
-                 key={i}
-                 onClick={() => sendMessage(q)}
-                 disabled={isThinking}
-                 className="whitespace-nowrap px-3 py-1.5 bg-slate-800 border border-cyan-500/30 rounded-full text-xs text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-400 transition-all disabled:opacity-50 active:scale-95"
-               >
-                 {q}
-               </button>
-             ))}
+          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ (Горизонтальный скролл) */}
+          <div className="border-t border-slate-800 bg-slate-900/90 backdrop-blur-sm">
+             <div className="flex gap-2 overflow-x-auto scrollbar-hide py-3 px-4 w-full touch-pan-x">
+               {QUICK_QUESTIONS.map((q, i) => (
+                 <button
+                   key={i}
+                   onClick={() => sendMessage(q)}
+                   disabled={isThinking}
+                   className="whitespace-nowrap flex-shrink-0 px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-full text-xs text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-400 transition-all disabled:opacity-50 active:scale-95"
+                 >
+                   {q}
+                 </button>
+               ))}
+               {/* Пустой блок в конце, чтобы последняя кнопка не прилипала к краю на мобильных */}
+               <div className="w-2 flex-shrink-0" />
+             </div>
           </div>
 
           {/* Форма ввода */}
