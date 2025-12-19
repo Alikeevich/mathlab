@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { askMeerkat } from '../lib/gemini';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Send, Sparkles } from 'lucide-react';
-// ИМПОРТЫ ДЛЯ МАТЕМАТИКИ
+import { X, Send, Sparkles, Utensils } from 'lucide-react'; // Добавил иконку еды
 import Latex from 'react-latex-next';
 import 'katex/dist/katex.min.css';
 
@@ -17,7 +16,6 @@ type Message = {
   parts: string;
 };
 
-// БЫСТРЫЕ ВОПРОСЫ
 const QUICK_QUESTIONS = [
   "Как решить эту задачу?",
   "Дай подсказку, но не ответ",
@@ -29,29 +27,49 @@ const QUICK_QUESTIONS = [
 export function CompanionChat({ onClose, problemContext }: Props) {
   const { profile } = useAuth();
   const companionName = profile?.companion_name || 'Сурикат';
+  const hunger = profile?.companion_hunger ?? 100; // Получаем голод
   
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'meerkat', parts: `Привет, коллега! Застрял на этой задаче? Давай разберем её вместе. Что именно непонятно?` }
+    { id: '1', role: 'meerkat', parts: `Привет, коллега! Застрял на этой задаче? Давай разберем её вместе.` }
   ]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Автоскролл вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isThinking]);
 
-  // УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОТПРАВКИ
   const sendMessage = async (text: string) => {
     if (!text.trim() || isThinking) return;
 
+    // 1. Добавляем сообщение юзера
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'me', parts: text }]);
+    
+    // === ПРОВЕРКА ГОЛОДА ===
+    if (hunger <= 0) {
+      setIsThinking(true);
+      
+      // Имитируем задержку, будто он пытается думать, но не может
+      setTimeout(() => {
+        setIsThinking(false);
+        const sadMessage = "Ох... Урчание в животе заглушает все мои мысли! 🍖\n\nКоллега, я слишком голоден (0%), чтобы делать вычисления. Пожалуйста, покорми меня в Домике, и мы продолжим!";
+        
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'meerkat', parts: sadMessage }]);
+      }, 1000);
+      
+      return; // ПРЕРЫВАЕМ ФУНКЦИЮ, НЕ ТРАТИМ API
+    }
+    // =======================
+
     setIsThinking(true);
 
+    // 2. Запрос к Gemini (только если сыт)
     const answer = await askMeerkat(messages, text, companionName, problemContext);
 
     setIsThinking(false);
+    
+    // 3. Добавляем ответ
     setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'meerkat', parts: answer }]);
   };
 
@@ -61,8 +79,11 @@ export function CompanionChat({ onClose, problemContext }: Props) {
     setInput('');
   };
 
-  // Выбор картинки (Думает или Обычный)
+  // Выбор спрайта
   const getSprite = () => {
+    // Если голоден (0%) — он плачет
+    if (hunger <= 0) return '/meerkat/crying.png';
+    
     if (isThinking) return '/meerkat/thinking.png';
     return '/meerkat/idle.png';
   };
@@ -71,10 +92,9 @@ export function CompanionChat({ onClose, problemContext }: Props) {
     <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
       <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-5xl h-[90vh] md:h-[80vh] md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 relative">
         
-        {/* === ЛЕВАЯ ЧАСТЬ: ЧАТ === */}
+        {/* ЛЕВАЯ ЧАСТЬ: ЧАТ */}
         <div className="flex-1 flex flex-col h-full bg-slate-900/50 min-w-0 z-10 relative">
           
-          {/* Шапка */}
           <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/30">
@@ -82,7 +102,13 @@ export function CompanionChat({ onClose, problemContext }: Props) {
               </div>
               <div>
                 <h3 className="font-bold text-white text-lg">{companionName}</h3>
-                <p className="text-xs text-cyan-400">ИИ-Ассистент Лаборатории</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-cyan-400">ИИ-Ассистент</p>
+                  {/* Индикатор голода в шапке */}
+                  <div className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${hunger <= 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-700 text-slate-400'}`}>
+                    <Utensils className="w-3 h-3" /> {hunger}%
+                  </div>
+                </div>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
@@ -90,16 +116,14 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             </button>
           </div>
 
-          {/* Список сообщений */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'me' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
                   msg.role === 'me' 
                     ? 'bg-cyan-600 text-white rounded-br-none' 
-                    : 'bg-slate-700 text-white border border-slate-600 rounded-bl-none' // <--- ИЗМЕНЕНО: Светлее фон и белый текст
+                    : 'bg-slate-700 text-white border border-slate-600 rounded-bl-none'
                 }`}>
-                  {/* Рендер текста + формул */}
                   {msg.parts.split('\n').map((line, i) => (
                     <p key={i} className="mb-1 min-h-[1em]">
                       <Latex>{line}</Latex>
@@ -109,7 +133,6 @@ export function CompanionChat({ onClose, problemContext }: Props) {
               </div>
             ))}
             
-            {/* Анимация "Печатает..." */}
             {isThinking && (
               <div className="flex justify-start">
                 <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 rounded-bl-none flex gap-2 items-center backdrop-blur-sm">
@@ -122,7 +145,6 @@ export function CompanionChat({ onClose, problemContext }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ПАНЕЛЬ БЫСТРЫХ ВОПРОСОВ (Исправленный скролл) */}
           <div className="border-t border-slate-800 bg-slate-900/90 backdrop-blur-sm shrink-0 z-20">
              <div className="flex gap-2 overflow-x-auto scrollbar-hide py-3 px-4 w-full touch-pan-x">
                {QUICK_QUESTIONS.map((q, i) => (
@@ -135,11 +157,10 @@ export function CompanionChat({ onClose, problemContext }: Props) {
                    {q}
                  </button>
                ))}
-               <div className="w-8 flex-shrink-0" /> {/* Отступ справа */}
+               <div className="w-8 flex-shrink-0" />
              </div>
           </div>
 
-          {/* Форма ввода */}
           <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-700 bg-slate-800 shrink-0 z-20">
             <div className="flex gap-2">
               <input 
@@ -161,21 +182,15 @@ export function CompanionChat({ onClose, problemContext }: Props) {
           </form>
         </div>
 
-        {/* === ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА (Адаптивный) === */}
+        {/* ПРАВАЯ ЧАСТЬ: ВИЗУАЛ СУРИКАТА */}
         <div className={`
-            /* MOBILE STYLES: Абсолютно поверх, справа внизу (над кнопками), прозрачный, пропускает клики */
             absolute bottom-[140px] right-[-20px] w-40 h-40 z-0 pointer-events-none opacity-100
-            
-            /* DESKTOP STYLES: Статичная колонка справа */
             md:static md:w-80 md:h-full md:opacity-100 md:bg-gradient-to-b md:from-slate-800 md:to-slate-900 md:border-l md:border-slate-700
-            
             flex flex-col items-center justify-end overflow-hidden shrink-0 transition-all duration-300
         `}>
           
-          {/* Фон (Только на десктопе виден нормально) */}
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.2),transparent_70%)] hidden md:block" />
           
-          {/* СУРИКАТ */}
           <div className={`relative z-10 mb-[-10px] md:mb-[-20px] transition-all duration-300 ${isThinking ? 'scale-105' : 'hover:scale-105'}`}>
              <img 
                src={getSprite()} 
@@ -185,11 +200,18 @@ export function CompanionChat({ onClose, problemContext }: Props) {
              />
           </div>
           
-          {/* Облачко с мыслями (Адаптивное позиционирование) */}
-          {isThinking && (
+          {/* Облачко с мыслями */}
+          {isThinking && hunger > 0 && (
             <div className="absolute top-0 right-10 md:top-12 md:right-6 bg-white text-black text-xs font-bold px-3 py-2 rounded-2xl rounded-bl-none animate-bounce shadow-xl z-20 max-w-[120px] md:max-w-[160px] border-2 border-cyan-500">
               Хм-м... 🤔
             </div>
+          )}
+
+          {/* Облачко с ГОЛОДОМ */}
+          {hunger <= 0 && (
+             <div className="absolute top-0 right-10 md:top-12 md:right-6 bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-2xl rounded-bl-none animate-pulse shadow-xl z-20 max-w-[120px] md:max-w-[160px]">
+               ХОЧУ ЕСТЬ! 🍖
+             </div>
           )}
         </div>
 

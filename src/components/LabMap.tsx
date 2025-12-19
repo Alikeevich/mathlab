@@ -51,7 +51,7 @@ type LabMapProps = {
 };
 
 export function LabMap({ onSectorSelect }: LabMapProps) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth(); // Достаем user, чтобы проверять, гость это или нет
   const [sectors, setSectors] = useState<Sector[]>([]);
 
   useEffect(() => {
@@ -59,10 +59,11 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
   }, []);
 
   async function loadSectors() {
+    // ВАЖНО: RLS в Supabase должен позволять SELECT * FROM sectors всем (public)
     const { data } = await supabase
       .from('sectors')
       .select('*')
-      .neq('id', 99) // Скрываем PvP сектор с карты
+      .neq('id', 99) 
       .order('id');
 
     if (data) {
@@ -70,7 +71,15 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
     }
   }
 
+  // === ЛОГИКА ДОСТУПА ===
   const isUnlocked = (sector: Sector) => {
+    // 1. Если это ГОСТЬ (нет юзера)
+    if (!user) {
+      // Открываем только Сектор 0 (Логика) и Сектор 1 (Алгебра) для пробы
+      return sector.id === 0 || sector.id === 1;
+    }
+    
+    // 2. Если это ЮЗЕР — смотрим на его уровень
     return (profile?.clearance_level ?? 0) >= sector.required_clearance;
   };
 
@@ -81,7 +90,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
           <div className="inline-block mb-4">
             <div className="px-6 py-2 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-full">
               <span className="text-cyan-400 font-mono text-sm">
-                CLEARANCE LEVEL: {profile?.clearance_level ?? 0}
+                {!user ? 'РЕЖИМ: ДЕМО-ДОСТУП' : `CLEARANCE LEVEL: ${profile?.clearance_level ?? 0}`}
               </span>
             </div>
           </div>
@@ -89,20 +98,21 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
             Архитектура Научного Центра
           </h1>
           <p className="text-cyan-300/60 text-lg">
-            Выберите сектор для начала исследований
+            {!user 
+              ? 'Вам доступны только базовые отсеки. Зарегистрируйтесь, чтобы открыть всю карту.'
+              : 'Выберите сектор для начала исследований'
+            }
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sectors.map((sector) => {
-            // Безопасный выбор иконки
             const Icon = iconMap[sector.icon] || Zap;
             
             const unlocked = isUnlocked(sector);
             const gradient = colorMap[sector.color] || 'from-slate-500 to-slate-600';
             const glow = glowMap[sector.color] || 'shadow-slate-500/50';
 
-            // ВЫНЕСЛИ ЛОГИКУ СТИЛЕЙ СЮДА, ЧТОБЫ НЕ БЫЛО ОШИБКИ
             const baseClasses = "relative group p-6 rounded-2xl border-2 transition-all duration-300";
             const activeClasses = `bg-slate-800/50 backdrop-blur-sm border-${sector.color}-500/30 hover:border-${sector.color}-400 hover:shadow-2xl hover:${glow} hover:scale-[1.02] cursor-pointer`;
             const lockedClasses = "bg-slate-900/30 border-slate-700/30 cursor-not-allowed opacity-50";
@@ -117,7 +127,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                 className={cardClassName}
               >
                 {!unlocked && (
-                  <div className="absolute top-4 right-4">
+                  <div className="absolute top-4 right-4 z-10 bg-slate-900 rounded-full p-1">
                     <Lock className="w-5 h-5 text-slate-500" />
                   </div>
                 )}
@@ -147,7 +157,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
 
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-cyan-400/40 font-mono">
-                    Требуется: LVL {sector.required_clearance}
+                    {!user ? (unlocked ? 'ДОСТУПНО' : 'НУЖЕН АККАУНТ') : `Требуется: LVL ${sector.required_clearance}`}
                   </div>
                   {unlocked && (
                     <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />

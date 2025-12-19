@@ -13,7 +13,8 @@ import {
   Clock,
   Zap,
   Loader,
-  MessageSquare
+  MessageSquare,
+  Lock // Иконка замка
 } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { CompanionChat } from './CompanionChat';
@@ -30,9 +31,10 @@ type Problem = {
 type ReactorProps = {
   module: Module;
   onBack: () => void;
+  onRequestAuth?: () => void; // Проп для вызова регистрации
 };
 
-export function Reactor({ module, onBack }: ReactorProps) {
+export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const { user, profile, refreshProfile } = useAuth();
   
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -45,8 +47,12 @@ export function Reactor({ module, onBack }: ReactorProps) {
   const [showHint, setShowHint] = useState(false);
   
   const [startTime, setStartTime] = useState(Date.now());
-  const [problemsSolved, setProblemsSolved] = useState(0);
+  const [problemsSolved, setProblemsSolved] = useState(0); // Счетчик за сессию
   const [correctCount, setCorrectCount] = useState(0);
+
+  // === ГОСТЕВОЙ ЛИМИТ ===
+  const GUEST_LIMIT = 3;
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const handleKeyInput = (symbol: string) => {
     setUserAnswer((prev) => prev + symbol);
@@ -60,16 +66,11 @@ export function Reactor({ module, onBack }: ReactorProps) {
     async function fetchProblems() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('problems')
           .select('*')
           .eq('module_id', module.id);
-
-        if (error) {
-          console.error('Ошибка:', error);
-          return;
-        }
-
+        
         if (data && data.length > 0) {
           const shuffled = data.sort(() => 0.5 - Math.random());
           setProblems(shuffled);
@@ -79,11 +80,16 @@ export function Reactor({ module, onBack }: ReactorProps) {
         setLoading(false);
       }
     }
-
     fetchProblems();
   }, [module.id]);
 
   function loadNextProblem() {
+    // ЕСЛИ ГОСТЬ И ЛИМИТ ИСЧЕРПАН
+    if (!user && problemsSolved >= GUEST_LIMIT) {
+      setShowPaywall(true);
+      return;
+    }
+
     if (problems.length === 0) return;
     const randomProblem = problems[Math.floor(Math.random() * problems.length)];
     setCurrentProblem(randomProblem);
@@ -95,70 +101,76 @@ export function Reactor({ module, onBack }: ReactorProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentProblem || !user) return;
+    if (!currentProblem) return;
 
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
     const isCorrect = checkAnswer(userAnswer, currentProblem.answer);
 
     setResult(isCorrect ? 'correct' : 'incorrect');
+    setProblemsSolved(prev => prev + 1); // Увеличиваем счетчик сессии
+    if (isCorrect) setCorrectCount(prev => prev + 1);
 
-    await supabase.from('experiments').insert({
-      user_id: user.id,
-      module_id: module.id,
-      problem_id: currentProblem.id, 
-      problem_type: currentProblem.type,
-      correct: isCorrect,
-      time_spent: timeSpent,
-    });
+    // СОХРАНЯЕМ В БАЗУ ТОЛЬКО ЕСЛИ ЮЗЕР ЗАЛОГИНЕН
+    if (user) {
+      await supabase.from('experiments').insert({
+        user_id: user.id,
+        module_id: module.id,
+        problem_id: currentProblem.id, 
+        problem_type: currentProblem.type,
+        correct: isCorrect,
+        time_spent: timeSpent,
+      });
 
-    setProblemsSolved(prev => prev + 1);
-    if (isCorrect) {
-      setCorrectCount(prev => prev + 1);
-      setTimeout(() => {
-        refreshProfile(); 
-      }, 100);
-    }
+      if (isCorrect) {
+        setTimeout(() => refreshProfile(), 100);
+        
+        const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
+        const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
+        const newPercentage = Math.min(newExperiments * 10, 100);
 
-    if (isCorrect) {
-        const { data: progressData } = await supabase
-          .from('user_progress')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('module_id', module.id)
-          .maybeSingle();
-
-       const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
-       const newPercentage = Math.min(newExperiments * 10, 100);
-
-       if (progressData) {
-         await supabase.from('user_progress').update({
-             experiments_completed: newExperiments,
-             completion_percentage: newPercentage,
-             last_accessed: new Date().toISOString(),
-           }).eq('id', progressData.id);
-       } else {
-         await supabase.from('user_progress').insert({
-           user_id: user.id,
-           module_id: module.id,
-           experiments_completed: 1,
-           completion_percentage: 10,
-         });
-       }
+        if (progressData) {
+          await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
+        } else {
+          await supabase.from('user_progress').insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
+        }
+      }
     }
 
     setTimeout(() => {
       loadNextProblem();
-    }, 3000); // Даем 3 секунды посмотреть на правильный ответ
+    }, 2000);
   }
 
   const successRate = problemsSolved > 0 ? ((correctCount / problemsSolved) * 100).toFixed(0) : 0;
 
-  if (loading) {
+  if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
+
+  // === ЭКРАН БЛОКИРОВКИ (PAYWALL) ===
+  if (showPaywall) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-cyan-400 flex flex-col items-center gap-4">
-          <Loader className="w-10 h-10 animate-spin" />
-          <span className="font-mono animate-pulse">Инициализация реактора...</span>
+      <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in zoom-in duration-300">
+        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600" />
+          
+          <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/50">
+            <Lock className="w-10 h-10 text-amber-400" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-white mb-3">Демо-режим завершен</h2>
+          <p className="text-slate-400 mb-8">
+            Вы решили {GUEST_LIMIT} задачи! Чтобы продолжить обучение, сохранять прогресс и открыть PvP — нужно создать аккаунт. Это бесплатно.
+          </p>
+
+          <button 
+            onClick={onRequestAuth}
+            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105"
+          >
+            Создать аккаунт
+          </button>
+          
+          <button onClick={onBack} className="mt-4 text-slate-500 hover:text-white text-sm">
+            Вернуться в меню
+          </button>
         </div>
       </div>
     );
@@ -167,13 +179,20 @@ export function Reactor({ module, onBack }: ReactorProps) {
   return (
     <div className="w-full h-full overflow-y-auto pb-20">
       <div className="max-w-4xl mx-auto p-8">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 mb-8 transition-colors group"
-        >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span>Прервать эксперимент</span>
-        </button>
+        
+        {/* Шапка с кнопкой назад и счетчиком демо */}
+        <div className="flex justify-between items-center mb-8">
+           <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group">
+             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+             <span>Назад</span>
+           </button>
+
+           {!user && (
+             <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold font-mono">
+               ДЕМО: {problemsSolved}/{GUEST_LIMIT}
+             </div>
+           )}
+        </div>
 
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -197,7 +216,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
             <div className="text-2xl font-bold text-white">{correctCount}</div>
           </div>
           <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4">
-            <div className="text-purple-400/60 text-sm mb-1">КПД (Сессия)</div>
+            <div className="text-purple-400/60 text-sm mb-1">КПД</div>
             <div className="text-2xl font-bold text-white">{successRate}%</div>
           </div>
         </div>
@@ -214,14 +233,9 @@ export function Reactor({ module, onBack }: ReactorProps) {
             <div className="mb-8 relative z-10">
               {currentProblem.image_url && (
                 <div className="mb-6 flex justify-center">
-                  <img 
-                    src={currentProblem.image_url} 
-                    alt="График к задаче" 
-                    className="max-h-64 rounded-lg border border-cyan-500/30 shadow-lg"
-                  />
+                  <img src={currentProblem.image_url} alt="График" className="max-h-64 rounded-lg border border-cyan-500/30 shadow-lg"/>
                 </div>
               )}
-
               <h2 className="text-2xl font-semibold text-white mb-4 leading-relaxed">
                 <Latex>{currentProblem.question}</Latex>
               </h2>
@@ -230,14 +244,12 @@ export function Reactor({ module, onBack }: ReactorProps) {
             {result === null ? (
               <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
                 <div>
-                  <label className="block text-cyan-300 text-sm font-medium mb-2">
-                    Ввод данных
-                  </label>
+                  <label className="block text-cyan-300 text-sm font-medium mb-2">Ввод данных</label>
                   <input
                     type="text"
                     value={userAnswer}
                     onChange={(e) => setUserAnswer(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-900/80 border border-cyan-500/30 rounded-lg text-white text-lg placeholder-cyan-300/30 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all font-mono"
+                    className="w-full px-4 py-3 bg-slate-900/80 border border-cyan-500/30 rounded-lg text-white text-lg focus:outline-none focus:border-cyan-400 font-mono"
                     placeholder="Ответ..."
                     autoFocus
                   />
@@ -246,86 +258,45 @@ export function Reactor({ module, onBack }: ReactorProps) {
                 <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
 
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={!userAnswer.trim()}
-                    className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20"
-                  >
-                    Синтезировать ответ
+                  <button type="submit" disabled={!userAnswer.trim()} className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all">
+                    Ответить
                   </button>
 
-                  {profile?.companion_name && (
-                    <button
-                      type="button"
-                      onClick={() => setShowChat(true)}
-                      className="px-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium py-3 rounded-lg transition-all flex items-center justify-center gap-2"
-                      title="Спросить суриката"
-                    >
+                  {/* Чат суриката - только для зарегистрированных */}
+                  {user && profile?.companion_name && (
+                    <button type="button" onClick={() => setShowChat(true)} className="px-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 py-3 rounded-lg flex items-center justify-center gap-2">
                       <MessageSquare className="w-5 h-5" />
                       <span className="hidden sm:inline">Помощь</span>
                     </button>
                   )}
 
                   {!showHint && currentProblem.hint && (
-                    <button
-                      type="button"
-                      onClick={() => setShowHint(true)}
-                      className="px-6 bg-slate-700/50 hover:bg-slate-700 text-cyan-400 font-medium py-3 rounded-lg transition-all border border-cyan-500/20"
-                    >
-                      ?
-                    </button>
+                    <button type="button" onClick={() => setShowHint(true)} className="px-6 bg-slate-700/50 hover:bg-slate-700 text-cyan-400 font-medium py-3 rounded-lg">?</button>
                   )}
                 </div>
                 
                 {showHint && currentProblem.hint && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 mt-4">
-                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-blue-400 font-semibold text-sm mb-1">Данные разведки</div>
-                      <div className="text-blue-300/80 text-sm">
-                         <Latex>{currentProblem.hint}</Latex>
-                      </div>
-                    </div>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0" />
+                    <div className="text-blue-300/80 text-sm"><Latex>{currentProblem.hint}</Latex></div>
                   </div>
                 )}
               </form>
             ) : (
-              <div
-                className={`p-6 rounded-xl border-2 animate-in zoom-in-95 duration-200 ${
-                  result === 'correct'
-                    ? 'bg-emerald-500/10 border-emerald-500/50'
-                    : 'bg-red-500/10 border-red-500/50'
-                }`}
-              >
+              <div className={`p-6 rounded-xl border-2 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
                 <div className="flex items-center gap-4">
                   {result === 'correct' ? (
                     <>
-                      <div className="bg-emerald-500/20 p-2 rounded-full">
-                         <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-emerald-400">
-                          Синтез успешен!
-                        </div>
-                      </div>
+                      <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                      <div className="text-xl font-bold text-emerald-400">Верно!</div>
                     </>
                   ) : (
                     <>
-                       <div className="bg-red-500/20 p-2 rounded-full">
-                        <XCircle className="w-8 h-8 text-red-400" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-red-400">
-                          Ошибка вычислений
-                        </div>
-                        <div className="text-red-300/60 text-sm mt-1">
-                          Верное значение: 
-                          {/* ВОТ ТУТ МЫ ДОБАВИЛИ ДОЛЛАРЫ ДЛЯ КОРРЕКТНОГО ОТОБРАЖЕНИЯ */}
-                          <span className="font-mono font-bold ml-2 text-lg">
-                            <Latex>{`$${currentProblem.answer}$`}</Latex>
-                          </span>
-                        </div>
-                      </div>
+                       <XCircle className="w-8 h-8 text-red-400" />
+                       <div>
+                        <div className="text-xl font-bold text-red-400">Ошибка</div>
+                        <div className="text-red-300/60 text-sm mt-1">Ответ: <span className="font-mono font-bold"><Latex>{`$${currentProblem.answer}$`}</Latex></span></div>
+                       </div>
                     </>
                   )}
                 </div>
@@ -333,21 +304,12 @@ export function Reactor({ module, onBack }: ReactorProps) {
             )}
           </div>
         ) : (
-          <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-dashed border-cyan-500/30">
-            <Zap className="w-12 h-12 text-cyan-400/30 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Нет данных</h3>
-            <p className="text-cyan-300/40">
-              В этом секторе пока нет задач.
-            </p>
-          </div>
+          <div className="text-center py-12 text-slate-500">Нет задач</div>
         )}
       </div>
 
       {showChat && currentProblem && (
-         <CompanionChat 
-            onClose={() => setShowChat(false)} 
-            problemContext={currentProblem.question} 
-         />
+         <CompanionChat onClose={() => setShowChat(false)} problemContext={currentProblem.question} />
       )}
     </div>
   );
