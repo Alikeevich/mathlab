@@ -7,7 +7,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИСПРАВЛЕННЫЙ ИМПОРТ: Добавил Home
+// ИКОНКИ
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -22,6 +22,7 @@ import { TournamentLobby } from './components/TournamentLobby';
 import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
+import { LevelUpManager } from './components/LevelUpManager'; // Импорт есть
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
@@ -342,6 +343,9 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           
+          {/* !!! ВОТ ОН: МЕНЕДЖЕР ПОВЫШЕНИЙ !!! */}
+          <LevelUpManager />
+
           {profile?.is_admin && (
             <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
               <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
