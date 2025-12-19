@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Utensils, Zap, Sparkles } from 'lucide-react';
+import { CosmeticShop } from './CosmeticShop';
 
 type Props = {
   onClose: () => void;
@@ -9,66 +10,100 @@ type Props = {
 
 export function CompanionLair({ onClose }: Props) {
   const { profile, refreshProfile } = useAuth();
-  const [animationState, setAnimationState] = useState<'idle' | 'eating' | 'happy'>('idle');
+  const [animationState, setAnimationState] = useState<'idle' | 'eating' | 'happy' | 'crying'>('idle');
   const [hunger, setHunger] = useState(profile?.companion_hunger || 100);
+  const [showShop, setShowShop] = useState(false);
   
-  // === 1. УМНАЯ СИНХРОНИЗАЦИЯ ===
+  // Состояния для фоллбэка (если нет картинки для позы, используем обычную)
+  const [hatSrc, setHatSrc] = useState<string | null>(null);
+  const [bodySrc, setBodySrc] = useState<string | null>(null);
+
+  // === 1. УМНАЯ СИНХРОНИЗАЦИЯ (Осталась без изменений) ===
   useEffect(() => {
     async function syncHunger() {
       if (!profile) return;
-
       const lastUpdate = profile.last_fed_at ? new Date(profile.last_fed_at).getTime() : Date.now();
       const now = Date.now();
-      
-      // Сколько часов прошло с последнего сохранения/кормления
-      // (Используем минуты для наглядности, если хочешь быстрее - дели на 1000 * 60)
       const hoursPassed = (now - lastUpdate) / (1000 * 60 * 60);
-      
-      // Потеря голода: 5 единиц в час
       const hungerLoss = Math.floor(hoursPassed * 5);
 
       if (hungerLoss > 0) {
-        // Отнимаем от ТЕКУЩЕГО значения в базе, а не от 100!
-        // Это позволяет тебе менять значение в базе вручную, и оно не сбросится
         const newHunger = Math.max(0, (profile.companion_hunger || 100) - hungerLoss);
-
         setHunger(newHunger);
-        
-        // Обновляем базу: записываем новый голод и ТЕКУЩЕЕ ВРЕМЯ
-        // Теперь время будет точкой отсчета для следующего падения
         await supabase.from('profiles').update({ 
           companion_hunger: newHunger,
           last_fed_at: new Date().toISOString()
         }).eq('id', profile.id);
-        
         refreshProfile();
       } else {
-        // Если времени прошло мало, просто показываем то, что в базе
         setHunger(profile.companion_hunger);
       }
     }
-
     syncHunger();
-  }, []); // Запускаем только при открытии окна
+    const interval = setInterval(syncHunger, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // === АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ СОСТОЯНИЯ ===
+  useEffect(() => {
+    // Если идет активная анимация (ест/рад) - не трогаем
+    if (animationState === 'eating' || animationState === 'happy') return;
+
+    // Иначе ставим состояние по голоду
+    if (hunger < 30) {
+      setAnimationState('crying');
+    } else {
+      setAnimationState('idle');
+    }
+  }, [hunger, animationState]); // Следим за голодом
+
+  // === УМНАЯ ПОДГРУЗКА ОДЕЖДЫ ===
+  // Эта функция пытается найти картинку для текущей позы
+  // Например: cap_crying.png. Если не находит - оставляет cap.png
+  useEffect(() => {
+    const updateCosmetic = (originalUrl: string | null, setFunc: (s: string | null) => void) => {
+      if (!originalUrl) {
+        setFunc(null);
+        return;
+      }
+      
+      // Если поза обычная - сразу ставим оригинал
+      if (animationState === 'idle') {
+        setFunc(originalUrl);
+        return;
+      }
+
+      // Пытаемся создать путь типа: /cosmetics/cap_crying.png
+      const poseUrl = originalUrl.replace('.png', `_${animationState}.png`);
+
+      // Проверяем, существует ли файл
+      const img = new Image();
+      img.src = poseUrl;
+      img.onload = () => setFunc(poseUrl); // Если есть - ставим его
+      img.onerror = () => setFunc(originalUrl); // Если нет - ставим обычный (фоллбэк)
+    };
+
+    updateCosmetic(profile?.equipped_hat, setHatSrc);
+    updateCosmetic(profile?.equipped_body, setBodySrc);
+
+  }, [profile?.equipped_hat, profile?.equipped_body, animationState]);
+
 
   // === 2. ФУНКЦИЯ КОРМЛЕНИЯ ===
   const feedCompanion = async () => {
     if (hunger >= 100) return;
     
     setAnimationState('eating');
-    
-    // Прибавляем 20 к ТЕКУЩЕМУ, но не больше 100
     const newHunger = Math.min(100, hunger + 20);
     setHunger(newHunger);
 
-    // Сохраняем и обновляем таймер (чтобы голод начал падать заново от этого момента)
     await supabase.from('profiles').update({ 
       companion_hunger: newHunger,
       last_fed_at: new Date().toISOString()
     }).eq('id', profile!.id);
 
     setTimeout(() => setAnimationState('happy'), 500);
-    setTimeout(() => setAnimationState('idle'), 1500);
+    setTimeout(() => setAnimationState('idle'), 1500); // Вернется в idle, а useEffect выше проверит, не нужно ли плакать
     
     refreshProfile();
   };
@@ -79,17 +114,20 @@ export function CompanionLair({ onClose }: Props) {
   };
 
   const getSprite = () => {
-    if (animationState === 'eating') return '/meerkat/eating.png';
-    if (animationState === 'happy') return '/meerkat/happy.png';
-    if (hunger < 30) return '/meerkat/crying.png';
-    return '/meerkat/idle.png';
+    switch (animationState) {
+      case 'eating': return '/meerkat/eating.png';
+      case 'happy': return '/meerkat/happy.png';
+      case 'crying': return '/meerkat/crying.png';
+      default: return '/meerkat/idle.png';
+    }
   };
 
   const getAnimationClass = () => {
     switch (animationState) {
       case 'eating': return 'scale-105';
       case 'happy': return 'animate-pulse scale-110';
-      default: return hunger < 30 ? 'animate-pulse opacity-80' : 'hover:scale-105 transition-transform';
+      case 'crying': return 'animate-bounce'; // Дрожит когда плачет
+      default: return 'hover:scale-105 transition-transform';
     }
   };
 
@@ -115,15 +153,33 @@ export function CompanionLair({ onClose }: Props) {
         <div className="relative h-72 bg-slate-950/50 rounded-2xl border-2 border-slate-700 flex items-center justify-center mb-6 overflow-hidden">
           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]" />
 
+          {/* ПЕРСОНАЖ И ОДЕЖДА */}
           <div 
-             className={`relative z-10 transition-all duration-300 cursor-pointer ${getAnimationClass()}`}
+             className={`relative z-10 transition-all duration-300 cursor-pointer ${getAnimationClass()} h-56 w-56 flex items-center justify-center`}
              onClick={handlePet}
           >
+             {/* 1. БАЗА */}
              <img 
                src={getSprite()} 
                alt="Сурикат" 
-               className="w-56 h-56 object-contain drop-shadow-2xl" 
+               className="absolute inset-0 w-full h-full object-contain z-10" 
              />
+
+             {/* 2. ТЕЛО (Динамическое) */}
+             {bodySrc && (
+               <img 
+                 src={bodySrc} 
+                 className="absolute inset-0 w-full h-full object-contain z-20 pointer-events-none"
+               />
+             )}
+
+             {/* 3. ГОЛОВА (Динамическая) */}
+             {hatSrc && (
+               <img 
+                 src={hatSrc} 
+                 className="absolute inset-0 w-full h-full object-contain z-30 pointer-events-none"
+               />
+             )}
           </div>
 
           {hunger < 30 && (
@@ -173,12 +229,15 @@ export function CompanionLair({ onClose }: Props) {
           </button>
           
           <button 
-            className="py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all opacity-50 cursor-not-allowed"
+            onClick={() => setShowShop(!showShop)}
+            className="py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all"
           >
             <div className="text-xl">👕</div>
-            Нарядить
+            {showShop ? 'Закрыть' : 'Гардероб'}
           </button>
         </div>
+        
+        {showShop && <CosmeticShop />}
 
       </div>
     </div>
