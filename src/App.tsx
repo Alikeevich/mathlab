@@ -7,7 +7,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-import { LevelUpManager } from './components/LevelUpManager';
+// ИСПРАВЛЕННЫЙ ИМПОРТ: Добавил Home
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -185,7 +185,6 @@ function MainApp() {
       <header className="relative border-b border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm z-10">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-4">
           
-          {/* ЛОГОТИП (Теперь клик по нему тоже ведет на главную карту) */}
           <button onClick={handleBackToMap} className="flex items-center gap-3 hover:opacity-80 transition-opacity group min-w-fit">
             <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all">
               <Menu className="w-6 h-6 text-white" />
