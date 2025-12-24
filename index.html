@@ -1,23 +1,24 @@
-<!DOCTYPE html>
-<html lang="ru">
-  <head>
+<head>
     <meta charset="UTF-8" />
     
-    <!-- ИСПРАВЛЕННЫЙ CSP: Добавил "font-src * data:;" в конец -->
+    <!-- CSP (Оставляем как было) -->
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline'; font-src * data:;" />
     
-    <link rel="icon" type="image/png" href="/meerkat/avatar.png" />
+    <!-- === ГЛАВНЫЕ ИКОНКИ === -->
+    <!-- 1. Стандартная иконка для вкладки (корень) -->
+    <link rel="icon" href="/favicon.ico" />
+    <!-- 2. PNG иконки разных размеров (Google это любит) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/meerkat/avatar.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/meerkat/avatar.png" />
+    <!-- 3. Иконка для Apple и закладок на телефоне -->
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- SEO ТЕГИ -->
+    <!-- SEO -->
     <title>MathLab PvP — Подготовка к ЕНТ по Математике</title>
     <meta name="description" content="Первая в Казахстане PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями, прокачивай своего питомца и участвуй в турнирах." />
     
     <meta name="theme-color" content="#0f172a" />
     <link rel="canonical" href="https://mathlabpvp.org/" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+</head>
