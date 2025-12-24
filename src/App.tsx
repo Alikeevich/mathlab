@@ -363,6 +363,47 @@ function MainApp() {
               </div>
             </>
           )}
+{/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
+            <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3">
+              
+              {user ? (
+                 <>
+                  {/* --- НОВАЯ КНОПКА: ПЕРЕЗАХОД --- */}
+                  <button 
+                    onClick={manualReconnect}
+                    disabled={isReconnecting}
+                    className="p-3 md:p-4 bg-slate-800 border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
+                    title="Проверить активные игры (Перезаход)"
+                  >
+                    <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
+                  </button>
+
+                  {/* Кнопка 1: Войти по коду */}
+                  <button 
+                    onClick={() => setShowJoinCode(true)}
+                    className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800 border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                  >
+                    <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                    <span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
+                  </button>
+
+                  {/* Кнопка 2: PvP Арена (Большая) */}
+                  <button 
+                    onClick={() => setView('pvp')}
+                    className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900 border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
+                    <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
+                    <span className="font-black text-white text-lg tracking-widest italic">PVP</span>
+                  </button>
+                 </>
+              ) : (
+                // ЗАГЛУШКА ДЛЯ ГОСТЯ
+                <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md">
+                   <Lock className="w-4 h-4" /> PvP и Турниры доступны после регистрации
+                </div>
+              )}
+            </div>
           
           {view === 'modules' && selectedSector && (
             <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />
