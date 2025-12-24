@@ -7,7 +7,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-import { CookieBanner } from './components/CookieBanner';
+// ИКОНКИ
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -128,7 +128,7 @@ function MainApp() {
 
   // === ПРОВЕРКИ ПРИ ЗАГРУЗКЕ ===
 
-  // 1. Проверка URL (код турнира)
+  // 1. Проверка URL
   useEffect(() => {
     if (!user) return;
     const params = new URLSearchParams(window.location.search);
@@ -138,12 +138,11 @@ function MainApp() {
     }
   }, [user]);
 
-  // 2. АВТО-РЕКОННЕКТ (Умный)
+  // 2. АВТО-РЕКОННЕКТ
   useEffect(() => {
     async function checkActiveSession() {
       if (!user) return;
 
-      // А. Проверяем участие в ТУРНИРЕ
       const { data: part } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
@@ -157,7 +156,6 @@ function MainApp() {
         return;
       }
 
-      // Б. Проверяем обычное PVP
       const { data: duel } = await supabase
         .from('duels')
         .select('id')
@@ -196,21 +194,14 @@ function MainApp() {
     checkHosting();
   }, [user, profile]);
 
-  // 4. Онбординг и Встреча с Сурикатом
+  // 4. Онбординг
   useEffect(() => {
     if (!profile) return;
-
     if (profile.total_experiments === 0 && profile.clearance_level === 0) {
       const hasSeen = localStorage.getItem('onboarding_seen');
-      if (!hasSeen) {
-        setShowOnboarding(true);
-        return; 
-      }
+      if (!hasSeen) { setShowOnboarding(true); return; }
     }
-
-    if (!profile.companion_name) {
-      setShowCompanionSetup(true);
-    }
+    if (!profile.companion_name) setShowCompanionSetup(true);
   }, [profile, showOnboarding]);
 
   function finishOnboarding() {
@@ -261,9 +252,7 @@ function MainApp() {
           onLogin={() => setShowAuthModal(true)} 
           onOpenLegal={(type) => setShowLegal(type)}
         />
-        {/* Модалка Документов для Лендинга */}
         {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
-        <CookieBanner />
       </>
     );
   }
@@ -271,19 +260,10 @@ function MainApp() {
   // === 2. ВХОД ===
   if (!user && showAuthModal) {
     return (
-      <>
-        <div className="relative">
-           <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
-           {/* Передаем функцию открытия документов */}
-           <Auth onOpenLegal={(type) => setShowLegal(type)} />
-        </div>
-        
-        {/* Модалка для документов (чтобы открывалась поверх Auth) */}
-        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
-        
-        {/* Баннер куки */}
-        <CookieBanner />
-      </>
+      <div className="relative">
+         <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
+         <Auth />
+      </div>
     );
   }
 
@@ -320,7 +300,6 @@ function MainApp() {
         <header className="relative border-b border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm z-10">
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-4">
             
-            {/* Кнопка "НАЗАД / МЕНЮ" */}
             <button onClick={handleBackToMap} className="flex items-center gap-3 hover:opacity-80 transition-opacity group min-w-fit">
               <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all">
                 <Menu className="w-6 h-6 text-white" />
@@ -339,10 +318,10 @@ function MainApp() {
                    {profile?.companion_name && (
                      <button 
                        onClick={() => setShowCompanion(true)}
-                       className="relative group p-1 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors mr-2"
+                       className="relative group p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors mr-2"
                        title={`Домик ${profile.companion_name}`}
                      >
-                       <div className="w-8 h-8 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
+                       <div className="w-6 h-6 md:w-8 md:h-8 flex items-center justify-center">
                           <img 
                             src="/meerkat/avatar.png" 
                             alt="Pet" 
@@ -407,7 +386,7 @@ function MainApp() {
               <LabMap onSectorSelect={handleSectorSelect} />
               
               {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
-              <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3">
+              <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 
                 {user ? (
                    <>
@@ -415,7 +394,7 @@ function MainApp() {
                     <button 
                       onClick={manualReconnect}
                       disabled={isReconnecting}
-                      className="p-3 md:p-4 bg-slate-800 border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
+                      className="p-3 md:p-4 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
                       title="Проверить активные игры (Перезаход)"
                     >
                       <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
@@ -423,7 +402,7 @@ function MainApp() {
 
                     <button 
                       onClick={() => setShowJoinCode(true)}
-                      className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800 border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                      className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
                     >
                       <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
                       <span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
@@ -431,7 +410,7 @@ function MainApp() {
 
                     <button 
                       onClick={() => setView('pvp')}
-                      className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900 border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
+                      className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
                       <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
@@ -459,6 +438,7 @@ function MainApp() {
             />
           )}
 
+          {/* PvP и Турниры только для User */}
           {user && view === 'pvp' && (
             <PvPMode onBack={handleBackToMap} />
           )}
@@ -485,6 +465,7 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           
+          {/* МОДАЛКА ВОССТАНОВЛЕНИЯ СЕССИИ */}
           {showReconnect && (
             <ReconnectModal 
               onReconnect={handleReconnectConfirm} 
@@ -494,8 +475,9 @@ function MainApp() {
           
           <LevelUpManager />
 
+          {/* КНОПКИ АДМИНА (ВЫШЕ, ЧТОБЫ НЕ ПЕРЕКРЫВАЛИСЬ) */}
           {profile?.is_admin && (
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+            <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
               <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
               <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm"><Settings className="w-6 h-6" /></button>
             </div>

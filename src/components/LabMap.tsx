@@ -3,33 +3,30 @@ import { supabase, Sector } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Brain,
-  Binary, // Заменил GitBranch на Binary (больше подходит для алгебры)
+  Binary,
   Activity,
   Zap,
   Radio,
-  Calculator, // Заменил Cpu на Calculator (Мат. Анализ)
-  Shapes,     // Заменил Box на Shapes (Геометрия)
+  Calculator,
+  Shapes,
   Lock,
   ChevronRight,
   Swords,
-  Atom // Добавил для красоты
+  Atom
 } from 'lucide-react';
 
-// Обновленный маппинг иконок (более математический)
 const iconMap: Record<string, any> = {
   brain: Brain,
-  'git-branch': Binary, // Алгебра теперь Binary
+  'git-branch': Binary,
   activity: Activity,
   zap: Zap,
   radio: Radio,
-  cpu: Calculator,      // Мат. анализ
-  box: Shapes,          // Геометрия
+  cpu: Calculator,
+  box: Shapes,
   swords: Swords,
   atom: Atom
 };
 
-// СИСТЕМА СТИЛЕЙ (GLOW ENGINE)
-// Для каждого цвета задаем: фон, текст, границу и тень
 const themeStyles: Record<string, { bg: string, text: string, border: string, shadow: string, iconBg: string }> = {
   emerald: {
     bg: 'hover:bg-emerald-950/30',
@@ -119,20 +116,20 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
         
         {/* ЗАГОЛОВОК */}
         <div className="mb-12 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 backdrop-blur-md shadow-lg">
-            <div className={`w-2 h-2 rounded-full ${!user ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
-            <span className="text-slate-300 font-mono text-xs font-bold tracking-wider">
-              {!user ? 'РЕЖИМ: ДЕМО' : `ДОСТУП: УРОВЕНЬ ${profile?.clearance_level ?? 0}`}
-            </span>
+          <div className="inline-block mb-4 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="px-6 py-2 bg-slate-900/60 backdrop-blur-md border border-cyan-500/30 rounded-full shadow-lg shadow-cyan-900/20">
+              <span className="text-cyan-400 font-mono text-sm tracking-widest font-bold">
+                {!user ? 'РЕЖИМ: ДЕМО-ДОСТУП' : `УРОВЕНЬ ДОСТУПА: ${profile?.clearance_level ?? 0}`}
+              </span>
+            </div>
           </div>
-          
           <h1 className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-sm">
             СЕКТОРЫ ЗНАНИЙ
           </h1>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto font-light">
+          <p className="text-slate-300/80 text-lg max-w-2xl mx-auto font-light">
             {!user 
-              ? 'Демонстрационный доступ к системам лаборатории.'
-              : 'Выберите модуль для изучения темы.'
+              ? 'Вам доступны только базовые отсеки. Зарегистрируйтесь, чтобы открыть всю лабораторию.'
+              : 'Выберите модуль для начала исследований и повышения уровня.'
             }
           </p>
         </div>
@@ -143,7 +140,6 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
             const Icon = iconMap[sector.icon] || Zap;
             const unlocked = isUnlocked(sector);
             
-            // Получаем стили для конкретного цвета, или дефолтные серые
             const style = themeStyles[sector.color] || {
               bg: 'hover:bg-slate-800',
               text: 'text-slate-400',
@@ -166,33 +162,37 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                   }
                 `}
               >
-                {/* Фоновая подсветка */}
+                {/* Подсветка */}
                 {unlocked && (
                   <div className={`absolute -right-10 -top-10 w-32 h-32 bg-gradient-to-br ${style.text.replace('text-', 'from-')}/20 to-transparent blur-3xl group-hover:opacity-100 transition-opacity duration-500`} />
                 )}
 
-                {/* Замок */}
-                {!unlocked && (
-                  <div className="absolute top-5 right-5 z-10 bg-black/40 rounded-full p-2 border border-slate-700 backdrop-blur-md">
-                    <Lock className="w-4 h-4 text-slate-500" />
-                  </div>
-                )}
-
-                {/* Верхняя часть с иконкой */}
-                <div className="flex items-start justify-between mb-6 z-10">
+                {/* ВЕРХНЯЯ ЧАСТЬ: Иконка слева, Статус справа */}
+                <div className="flex items-start justify-between mb-6 z-10 w-full">
+                  
+                  {/* Иконка сектора */}
                   <div className={`p-4 rounded-2xl ${unlocked ? style.iconBg : 'bg-slate-800 text-slate-600'} border border-white/5 shadow-inner transition-all duration-300 group-hover:scale-110`}>
                     <Icon className="w-8 h-8" />
                   </div>
                   
+                  {/* Правый верхний угол: Либо Номер сектора, либо Замок */}
                   <div className="text-right">
-                    <span className="block font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
-                      Сектор {sector.id}
-                    </span>
+                    {!unlocked ? (
+                      // ЕСЛИ ЗАКРЫТО: Показываем замок в красивой рамке
+                      <div className="bg-black/40 p-2 rounded-xl border border-slate-700/50 backdrop-blur-md shadow-lg">
+                        <Lock className="w-5 h-5 text-slate-400" />
+                      </div>
+                    ) : (
+                      // ЕСЛИ ОТКРЫТО: Показываем номер
+                      <span className="block font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1 px-2 py-1 rounded-lg bg-white/5 border border-white/5">
+                        Сектор {sector.id}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Контент */}
-                <div className="z-10">
+                <div className="z-10 h-full flex flex-col">
                   <h3 className={`text-2xl font-bold mb-3 leading-tight transition-colors ${unlocked ? 'text-white group-hover:text-white' : 'text-slate-500'}`}>
                     {sector.name}
                   </h3>
@@ -202,7 +202,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                   </p>
 
                   {/* Футер карточки */}
-                  <div className={`flex items-center justify-between border-t ${unlocked ? 'border-white/10' : 'border-white/5'} pt-4 mt-auto`}>
+                  <div className={`flex items-center justify-between border-t ${unlocked ? 'border-white/10' : 'border-white/5'} pt-4 mt-auto w-full`}>
                     <div className="text-xs font-mono font-bold flex items-center gap-2">
                       {!user 
                         ? (unlocked ? <span className="text-emerald-400">● ОТКРЫТО</span> : <span className="text-slate-500">🔒 ЗАКРЫТО</span>) 
