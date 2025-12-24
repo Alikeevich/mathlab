@@ -24,6 +24,7 @@ import { CompanionSetup } from './components/CompanionSetup';
 import { LevelUpManager } from './components/LevelUpManager';
 import { ReconnectModal } from './components/ReconnectModal';
 import PixelBlast from './components/PixelBlast';
+import { LegalModal } from './components/LegalModal';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
@@ -36,6 +37,7 @@ function MainApp() {
   // Состояния доступа
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
 
   // Состояния модальных окон
   const [showDashboard, setShowDashboard] = useState(false);
