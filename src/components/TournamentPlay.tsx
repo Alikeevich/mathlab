@@ -5,6 +5,7 @@ import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, CheckCircle2, Timer, ArrowLeft, Flag, AlertTriangle, WifiOff } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { checkAnswer } from '../lib/mathUtils';
+import { RealtimeChannel } from '@supabase/supabase-js'; // Тип
 
 type Props = {
   duelId: string;
@@ -34,8 +35,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const handleKeyInput = (s: string) => setUserAnswer(p => p + s);
   const handleBackspace = () => setUserAnswer(p => p.slice(0, -1));
 
-  // ИНИЦИАЛИЗАЦИЯ
+  // ИНИЦИАЛИЗАЦИЯ + ПОДПИСКА (Правильная версия)
   useEffect(() => {
+    let channel: RealtimeChannel | null = null;
+
     async function initMatch() {
       if (!user) return;
       const { data: duel } = await supabase.from('duels').select('*').eq('id', duelId).single();
@@ -71,7 +74,8 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       setOppScore(oppPts);
       setLoading(false);
       
-      const channel = supabase
+      // Подписка
+      channel = supabase
         .channel(`t-duel-${duel.id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duel.id}` }, 
         (payload) => {
@@ -84,11 +88,15 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           }
         })
         .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     }
+
     initMatch();
-  }, [duelId, user, onFinished]); // Добавил user и onFinished
+
+    // Правильный Cleanup
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [duelId, user, onFinished]);
 
   // Heartbeat
   useEffect(() => {
@@ -146,9 +154,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }, 1000);
   }, [duelId, user, myScore, currentProbIndex, problems.length]);
 
-  // ОБРАБОТЧИК ТАЙМЕРА (Мемоизирован)
+  // ОБРАБОТЧИК ТАЙМЕРА
   const handleTimeout = useCallback(() => {
-    if (feedback) return; // Защита от двойного вызова
+    if (feedback) return; 
     submitResult(false);
   }, [feedback, submitResult]);
 
@@ -167,11 +175,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [matchStatus, feedback, currentProbIndex, problems.length, handleTimeout]); // Добавлен handleTimeout
+  }, [matchStatus, feedback, currentProbIndex, problems.length, handleTimeout]);
 
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
 
-  // КНОПКА ОТВЕТА
   const handleAnswer = (e: React.FormEvent) => {
     e.preventDefault();
     if (feedback || userAnswer.trim() === '') return; 
@@ -180,7 +187,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     submitResult(isCorrect);
   }
 
-  // СДАЧА
+  // СДАЧА (Безопасный user?.id)
   const confirmSurrender = async () => {
     setShowSurrenderModal(false);
     if (duelId && user) {
@@ -191,11 +198,12 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   async function loadProblems(ids: string[]) {
     if (!ids || ids.length === 0) return;
     const { data } = await supabase.from('problems').select('*').in('id', ids);
+    // Сортировка по порядку в массиве ID
     const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
     setProblems(sorted);
   }
 
-  // === РЕНДЕР (Остался почти без изменений) ===
+  // === РЕНДЕР ===
   if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
 
   if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
@@ -237,7 +245,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
-      {/* (Модалки и UI остались те же, сократил для краткости, они работают верно) */}
+      
       {showSurrenderModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -266,6 +274,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         <button 
           onClick={() => setShowSurrenderModal(true)}
           className="absolute -top-12 left-0 md:static md:mr-4 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all flex items-center gap-2"
+          title="Сдаться"
         >
           <Flag className="w-5 h-5" />
           <span className="text-xs font-bold hidden md:inline">СДАТЬСЯ</span>
