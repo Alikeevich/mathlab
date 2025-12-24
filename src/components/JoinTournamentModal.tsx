@@ -9,7 +9,6 @@ type Props = {
 export function JoinTournamentModal({ onJoin, onClose }: Props) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.length === 4) {
@@ -19,17 +18,15 @@ export function JoinTournamentModal({ onJoin, onClose }: Props) {
         setError('Код должен состоять из 4 цифр');
     }
   };
-
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-slate-800 border border-cyan-500/30 rounded-2xl p-8 shadow-2xl relative">
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
         >
           <X className="w-6 h-6" />
         </button>
-
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Hash className="w-8 h-8 text-cyan-400" />
@@ -39,7 +36,6 @@ export function JoinTournamentModal({ onJoin, onClose }: Props) {
             Введите 4-значный код, который дал учитель
           </p>
         </div>
-
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             autoFocus
@@ -52,9 +48,8 @@ export function JoinTournamentModal({ onJoin, onClose }: Props) {
             placeholder="0000"
             className="w-full bg-slate-900 border-2 border-slate-600 focus:border-cyan-500 rounded-xl py-4 text-center text-4xl font-mono font-bold text-white tracking-[0.5em] placeholder-slate-700 outline-none transition-all"
           />
-          
+         
           {error && <div className="text-red-400 text-sm text-center font-bold animate-pulse">{error}</div>}
-
           <button
             type="submit"
             disabled={code.length < 4}
