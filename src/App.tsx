@@ -7,7 +7,6 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -91,7 +90,28 @@ function MainApp() {
     setIsReconnecting(true);
 
     try {
-      // 1. ТУРНИР
+      // 1. СНАЧАЛА ИЩЕМ АКТИВНЫЙ БОЙ (Самый высокий приоритет)
+      const { data: activeDuel } = await supabase
+        .from('duels')
+        .select('id, tournament_id')
+        .eq('status', 'active')
+        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (activeDuel) {
+        if (activeDuel.tournament_id) {
+          // Если это турнирный бой -> идем в лобби турнира
+          // (TournamentLobby сам увидит этот бой и сразу покажет экран игры)
+          setActiveTournamentId(activeDuel.tournament_id);
+          setView('tournament_lobby');
+        } else {
+          // Если это обычный PvP -> идем в PvP
+          setView('pvp');
+        }
+        return;
+      }
+
+      // 2. ЕСЛИ БОЯ НЕТ, ИЩЕМ ТУРНИР (Где мы просто участники и ждем)
       const { data: tourPart } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
@@ -105,20 +125,7 @@ function MainApp() {
         return;
       }
 
-      // 2. PVP
-      const { data: duel } = await supabase
-        .from('duels')
-        .select('id')
-        .eq('status', 'active')
-        .is('tournament_id', null)
-        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-        .maybeSingle();
-
-      if (duel) {
-        setView('pvp');
-        return;
-      }
-
+      // 3. НИЧЕГО НЕ НАЙДЕНО
       alert("Активных игр не найдено.");
     } catch (e) {
       console.error(e);
