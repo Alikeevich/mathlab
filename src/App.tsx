@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase.ts';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import QRCode from 'react-qr-code';
 import { TournamentBracket } from './TournamentBracket';
