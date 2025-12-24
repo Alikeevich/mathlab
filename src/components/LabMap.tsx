@@ -3,47 +3,83 @@ import { supabase, Sector } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Brain,
-  GitBranch,
+  Binary, // Заменил GitBranch на Binary (больше подходит для алгебры)
   Activity,
   Zap,
   Radio,
-  Cpu,
-  Box,
+  Calculator, // Заменил Cpu на Calculator (Мат. Анализ)
+  Shapes,     // Заменил Box на Shapes (Геометрия)
   Lock,
   ChevronRight,
-  Swords
+  Swords,
+  Atom // Добавил для красоты
 } from 'lucide-react';
 
-// Словарь иконок
+// Обновленный маппинг иконок (более математический)
 const iconMap: Record<string, any> = {
   brain: Brain,
-  'git-branch': GitBranch,
+  'git-branch': Binary, // Алгебра теперь Binary
   activity: Activity,
   zap: Zap,
   radio: Radio,
-  cpu: Cpu,
-  box: Box,
-  swords: Swords
+  cpu: Calculator,      // Мат. анализ
+  box: Shapes,          // Геометрия
+  swords: Swords,
+  atom: Atom
 };
 
-const colorMap: Record<string, string> = {
-  emerald: 'from-emerald-500 to-green-500',
-  blue: 'from-blue-500 to-cyan-500',
-  purple: 'from-purple-500 to-pink-500',
-  orange: 'from-orange-500 to-amber-500',
-  red: 'from-red-500 to-rose-500',
-  cyan: 'from-cyan-500 to-teal-500',
-  pink: 'from-pink-500 to-fuchsia-500',
-};
-
-const glowMap: Record<string, string> = {
-  emerald: 'shadow-emerald-500/50',
-  blue: 'shadow-blue-500/50',
-  purple: 'shadow-purple-500/50',
-  orange: 'shadow-orange-500/50',
-  red: 'shadow-red-500/50',
-  cyan: 'shadow-cyan-500/50',
-  pink: 'shadow-pink-500/50',
+// СИСТЕМА СТИЛЕЙ (GLOW ENGINE)
+// Для каждого цвета задаем: фон, текст, границу и тень
+const themeStyles: Record<string, { bg: string, text: string, border: string, shadow: string, iconBg: string }> = {
+  emerald: {
+    bg: 'hover:bg-emerald-950/30',
+    text: 'text-emerald-400',
+    border: 'hover:border-emerald-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]',
+    iconBg: 'bg-emerald-500/20 text-emerald-300'
+  },
+  blue: {
+    bg: 'hover:bg-blue-950/30',
+    text: 'text-blue-400',
+    border: 'hover:border-blue-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]',
+    iconBg: 'bg-blue-500/20 text-blue-300'
+  },
+  purple: {
+    bg: 'hover:bg-purple-950/30',
+    text: 'text-purple-400',
+    border: 'hover:border-purple-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]',
+    iconBg: 'bg-purple-500/20 text-purple-300'
+  },
+  orange: {
+    bg: 'hover:bg-orange-950/30',
+    text: 'text-orange-400',
+    border: 'hover:border-orange-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(249,115,22,0.3)]',
+    iconBg: 'bg-orange-500/20 text-orange-300'
+  },
+  red: {
+    bg: 'hover:bg-red-950/30',
+    text: 'text-red-400',
+    border: 'hover:border-red-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(239,68,68,0.3)]',
+    iconBg: 'bg-red-500/20 text-red-300'
+  },
+  cyan: {
+    bg: 'hover:bg-cyan-950/30',
+    text: 'text-cyan-400',
+    border: 'hover:border-cyan-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]',
+    iconBg: 'bg-cyan-500/20 text-cyan-300'
+  },
+  pink: {
+    bg: 'hover:bg-pink-950/30',
+    text: 'text-pink-400',
+    border: 'hover:border-pink-500/50',
+    shadow: 'hover:shadow-[0_0_30px_rgba(236,72,153,0.3)]',
+    iconBg: 'bg-pink-500/20 text-pink-300'
+  },
 };
 
 type LabMapProps = {
@@ -51,7 +87,7 @@ type LabMapProps = {
 };
 
 export function LabMap({ onSectorSelect }: LabMapProps) {
-  const { user, profile } = useAuth(); // Достаем user, чтобы проверять, гость это или нет
+  const { user, profile } = useAuth();
   const [sectors, setSectors] = useState<Sector[]>([]);
 
   useEffect(() => {
@@ -59,7 +95,6 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
   }, []);
 
   async function loadSectors() {
-    // ВАЖНО: RLS в Supabase должен позволять SELECT * FROM sectors всем (public)
     const { data } = await supabase
       .from('sectors')
       .select('*')
@@ -71,101 +106,117 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
     }
   }
 
-  // === ЛОГИКА ДОСТУПА ===
   const isUnlocked = (sector: Sector) => {
-    // 1. Если это ГОСТЬ (нет юзера)
     if (!user) {
-      // Открываем только Сектор 0 (Логика) и Сектор 1 (Алгебра) для пробы
       return sector.id === 0 || sector.id === 1;
     }
-    
-    // 2. Если это ЮЗЕР — смотрим на его уровень
     return (profile?.clearance_level ?? 0) >= sector.required_clearance;
   };
 
   return (
-    <div className="w-full h-full overflow-y-auto p-8 pb-32">
+    <div className="w-full h-full overflow-y-auto p-4 md:p-8 pb-32 custom-scrollbar">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-12 text-center">
-          <div className="inline-block mb-4">
-            <div className="px-6 py-2 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-full">
-              <span className="text-cyan-400 font-mono text-sm">
-                {!user ? 'РЕЖИМ: ДЕМО-ДОСТУП' : `CLEARANCE LEVEL: ${profile?.clearance_level ?? 0}`}
-              </span>
-            </div>
+        
+        {/* ЗАГОЛОВОК */}
+        <div className="mb-12 text-center relative z-10">
+          <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 backdrop-blur-md shadow-lg">
+            <div className={`w-2 h-2 rounded-full ${!user ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+            <span className="text-slate-300 font-mono text-xs font-bold tracking-wider">
+              {!user ? 'РЕЖИМ: ДЕМО' : `ДОСТУП: УРОВЕНЬ ${profile?.clearance_level ?? 0}`}
+            </span>
           </div>
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Архитектура Научного Центра
+          
+          <h1 className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-sm">
+            СЕКТОРЫ ЗНАНИЙ
           </h1>
-          <p className="text-cyan-300/60 text-lg">
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto font-light">
             {!user 
-              ? 'Вам доступны только базовые отсеки. Зарегистрируйтесь, чтобы открыть всю карту.'
-              : 'Выберите сектор для начала исследований'
+              ? 'Демонстрационный доступ к системам лаборатории.'
+              : 'Выберите модуль для загрузки данных в нейросеть.'
             }
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* СЕТКА СЕКТОРОВ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
           {sectors.map((sector) => {
             const Icon = iconMap[sector.icon] || Zap;
-            
             const unlocked = isUnlocked(sector);
-            const gradient = colorMap[sector.color] || 'from-slate-500 to-slate-600';
-            const glow = glowMap[sector.color] || 'shadow-slate-500/50';
-
-            const baseClasses = "relative group p-6 rounded-2xl border-2 transition-all duration-300";
-            const activeClasses = `bg-slate-800/50 backdrop-blur-sm border-${sector.color}-500/30 hover:border-${sector.color}-400 hover:shadow-2xl hover:${glow} hover:scale-[1.02] cursor-pointer`;
-            const lockedClasses = "bg-slate-900/30 border-slate-700/30 cursor-not-allowed opacity-50";
             
-            const cardClassName = `${baseClasses} ${unlocked ? activeClasses : lockedClasses}`;
+            // Получаем стили для конкретного цвета, или дефолтные серые
+            const style = themeStyles[sector.color] || {
+              bg: 'hover:bg-slate-800',
+              text: 'text-slate-400',
+              border: 'hover:border-slate-600',
+              shadow: '',
+              iconBg: 'bg-slate-800 text-slate-500'
+            };
 
             return (
               <button
                 key={sector.id}
                 onClick={() => unlocked && onSectorSelect(sector)}
                 disabled={!unlocked}
-                className={cardClassName}
+                className={`
+                  relative group p-6 rounded-[2rem] border-2 text-left transition-all duration-500 w-full
+                  flex flex-col justify-between overflow-hidden backdrop-blur-sm
+                  ${unlocked 
+                    ? `bg-slate-900/60 border-slate-800 ${style.border} ${style.bg} ${style.shadow} hover:-translate-y-2` 
+                    : 'bg-slate-950/80 border-slate-800/50 opacity-60 cursor-not-allowed'
+                  }
+                `}
               >
+                {/* Фоновая подсветка */}
+                {unlocked && (
+                  <div className={`absolute -right-10 -top-10 w-32 h-32 bg-gradient-to-br ${style.text.replace('text-', 'from-')}/20 to-transparent blur-3xl group-hover:opacity-100 transition-opacity duration-500`} />
+                )}
+
+                {/* Замок */}
                 {!unlocked && (
-                  <div className="absolute top-4 right-4 z-10 bg-slate-900 rounded-full p-1">
-                    <Lock className="w-5 h-5 text-slate-500" />
+                  <div className="absolute top-5 right-5 z-10 bg-black/40 rounded-full p-2 border border-slate-700 backdrop-blur-md">
+                    <Lock className="w-4 h-4 text-slate-500" />
                   </div>
                 )}
 
-                <div className="flex items-start gap-4 mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} ${unlocked ? 'shadow-lg' : 'grayscale'}`}>
-                    <Icon className="w-8 h-8 text-white" />
+                {/* Верхняя часть с иконкой */}
+                <div className="flex items-start justify-between mb-6 z-10">
+                  <div className={`p-4 rounded-2xl ${unlocked ? style.iconBg : 'bg-slate-800 text-slate-600'} border border-white/5 shadow-inner transition-all duration-300 group-hover:scale-110`}>
+                    <Icon className="w-8 h-8" />
                   </div>
-                  <div className="flex-1 text-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-sm text-cyan-400/60">
-                        SECTOR {sector.id}
-                      </span>
-                      {unlocked && (
-                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      )}
+                  
+                  <div className="text-right">
+                    <span className="block font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                      Сектор {sector.id}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Контент */}
+                <div className="z-10">
+                  <h3 className={`text-2xl font-bold mb-3 leading-tight transition-colors ${unlocked ? 'text-white group-hover:text-white' : 'text-slate-500'}`}>
+                    {sector.name}
+                  </h3>
+                  
+                  <p className="text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">
+                    {sector.description}
+                  </p>
+
+                  {/* Футер карточки */}
+                  <div className={`flex items-center justify-between border-t ${unlocked ? 'border-white/10' : 'border-white/5'} pt-4 mt-auto`}>
+                    <div className="text-xs font-mono font-bold flex items-center gap-2">
+                      {!user 
+                        ? (unlocked ? <span className="text-emerald-400">● ОТКРЫТО</span> : <span className="text-slate-500">🔒 ЗАКРЫТО</span>) 
+                        : (unlocked ? <span className={`${style.text}`}>● ДОСТУПНО</span> : <span className="text-red-400/70">🔒 LVL {sector.required_clearance}</span>)
+                      }
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      {sector.name}
-                    </h3>
+                    
+                    {unlocked && (
+                      <div className={`p-1.5 rounded-full ${style.text} bg-white/5 group-hover:bg-white/10 transition-colors`}>
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <p className="text-cyan-300/60 text-sm mb-4 text-left line-clamp-2">
-                  {sector.description}
-                </p>
-
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-cyan-400/40 font-mono">
-                    {!user ? (unlocked ? 'ДОСТУПНО' : 'НУЖЕН АККАУНТ') : `Требуется: LVL ${sector.required_clearance}`}
-                  </div>
-                  {unlocked && (
-                    <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-                  )}
-                </div>
-
-                {/* Фоновое свечение */}
-                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-0 ${unlocked ? 'group-hover:opacity-5' : ''} transition-opacity pointer-events-none`} />
               </button>
             );
           })}
