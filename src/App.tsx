@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Auth } from './components/Auth';
 import { LandingPage } from './components/LandingPage';
@@ -7,7 +7,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ (Все необходимые, включая RotateCcw)
+// ИКОНКИ
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -52,7 +52,10 @@ function MainApp() {
   // Состояния восстановления
   const [showReconnect, setShowReconnect] = useState(false);
   const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false); // Спиннер для кнопки
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  
+  // Флаг, чтобы проверка запускалась только один раз
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
@@ -82,13 +85,13 @@ function MainApp() {
     }
   }
 
-  // === РУЧНОЙ ПЕРЕЗАХОД (КНОПКА) ===
+  // === РУЧНОЙ ПЕРЕЗАХОД ===
   async function manualReconnect() {
     if (!user) return;
     setIsReconnecting(true);
 
     try {
-      // 1. Проверяем ТУРНИР
+      // 1. ТУРНИР
       const { data: tourPart } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
@@ -102,7 +105,7 @@ function MainApp() {
         return;
       }
 
-      // 2. Проверяем PVP
+      // 2. PVP
       const { data: duel } = await supabase
         .from('duels')
         .select('id')
@@ -116,7 +119,6 @@ function MainApp() {
         return;
       }
 
-      // Если ничего не нашли
       alert("Активных игр не найдено.");
     } catch (e) {
       console.error(e);
@@ -127,7 +129,7 @@ function MainApp() {
 
   // === ПРОВЕРКИ ПРИ ЗАГРУЗКЕ ===
 
-  // 1. Проверка URL
+  // 1. URL (код турнира)
   useEffect(() => {
     if (!user) return;
     const params = new URLSearchParams(window.location.search);
@@ -137,12 +139,15 @@ function MainApp() {
     }
   }, [user]);
 
-  // 2. АВТО-РЕКОННЕКТ (Умный)
+  // 2. АВТО-РЕКОННЕКТ (ИСПРАВЛЕННЫЙ)
   useEffect(() => {
     async function checkActiveSession() {
-      if (!user) return;
+      // Если юзера нет, или мы уже проверили сессию, или мы уже в игре/лобби — не проверяем заново
+      if (!user || sessionChecked || view === 'tournament_lobby' || view === 'pvp') return;
 
-      // А. Проверяем участие в ТУРНИРЕ
+      setSessionChecked(true); // Помечаем, что проверка прошла
+
+      // А. Проверяем ТУРНИР
       const { data: part } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
@@ -171,7 +176,7 @@ function MainApp() {
     }
     
     checkActiveSession();
-  }, [user]);
+  }, [user, sessionChecked, view]); // Добавили зависимости
 
   const handleReconnectConfirm = () => {
     if (reconnectData?.type === 'tournament' && reconnectData.id) {
@@ -183,9 +188,10 @@ function MainApp() {
   
   const handleReconnectCancel = async () => {
      setShowReconnect(false);
+     // Не сбрасываем sessionChecked, чтобы не спросило снова до перезагрузки
   };
 
-  // Авто-админка
+  // 3. Авто-админка
   useEffect(() => {
     async function checkHosting() {
       if (!user || !profile?.is_admin) return;
@@ -195,7 +201,7 @@ function MainApp() {
     checkHosting();
   }, [user, profile]);
 
-  // Онбординг
+  // 4. Онбординг
   useEffect(() => {
     if (!profile) return;
     if (profile.total_experiments === 0 && profile.clearance_level === 0) {
@@ -213,44 +219,30 @@ function MainApp() {
   const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : { title: 'Гость', color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
-  // Навигация
   function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
   function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
+  
   function handleBackToMap() {
-    if (activeTournamentId && view === 'pvp') setView('tournament_lobby');
-    else { setView('map'); setSelectedSector(null); setActiveTournamentId(null); }
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ НАВИГАЦИИ
+    // Если мы в турнире (не важно, в бою или в лобби) и нажимаем "Назад" в шапке -> выходим на карту
+    // Чтобы вернуться в турнир, юзер нажмет кнопку "Перезаход" (кружок)
+    setView('map');
+    setSelectedSector(null);
+    setActiveTournamentId(null);
+    // setSessionChecked(false); // Можно раскомментировать, если хотим, чтобы снова спросило при возврате, но лучше нет
   }
+  
   function handleBackToModules() { setView('modules'); setSelectedModule(null); }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">
-        Загрузка...
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">Загрузка...</div>;
 
-  // === ЛЕНДИНГ ===
-  if (!user && !isGuest && !showAuthModal) {
-    return <LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} />;
-  }
+  if (!user && !isGuest && !showAuthModal) return <LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} />;
 
-  // === ВХОД ===
-  if (!user && showAuthModal) {
-    return (
-      <div className="relative">
-         <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
-         <Auth />
-      </div>
-    );
-  }
+  if (!user && showAuthModal) return <div className="relative"><button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button><Auth /></div>;
 
-  // === ПРИЛОЖЕНИЕ ===
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.05),transparent_70%)]" />
+    <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
       
-      {/* ФОН */}
       <div className="absolute inset-0 z-0">
         <PixelBlast variant="circle" pixelSize={6} color="#B19EEF" patternScale={3} patternDensity={1.2} pixelSizeJitter={0.5} enableRipples rippleSpeed={0.4} rippleThickness={0.12} rippleIntensityScale={1.5} liquid liquidStrength={0.12} liquidRadius={1.2} liquidWobbleSpeed={5} speed={0.6} edgeFade={0.25} transparent />
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
@@ -260,6 +252,7 @@ function MainApp() {
         <header className="relative border-b border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm z-10">
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-4">
             
+            {/* Кнопка "НАЗАД / МЕНЮ" */}
             <button onClick={handleBackToMap} className="flex items-center gap-3 hover:opacity-80 transition-opacity group min-w-fit">
               <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all">
                 <Menu className="w-6 h-6 text-white" />
@@ -273,7 +266,7 @@ function MainApp() {
             <div className="flex items-center gap-2 md:gap-4">
               {user ? (
                 <>
-                   {/* КНОПКА СУРИКАТА */}
+                   {/* СУРИКАТ */}
                    {profile?.companion_name && (
                      <button 
                        onClick={() => setShowCompanion(true)}
@@ -281,40 +274,22 @@ function MainApp() {
                        title={`Домик ${profile.companion_name}`}
                      >
                        <div className="w-8 h-8 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
-                          <img 
-                            src="/meerkat/avatar.png" 
-                            alt="Pet" 
-                            className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                            onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
-                          />
+                          <img src="/meerkat/avatar.png" alt="Pet" className="w-full h-full object-contain group-hover:scale-110 transition-transform" onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }} />
                        </div>
-                       {profile.companion_hunger < 30 && (
-                         <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
-                       )}
+                       {profile.companion_hunger < 30 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />}
                      </button>
                    )}
 
-                   <button onClick={() => setShowArchive(true)} className="p-1.5 md:p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title="Архив Знаний">
-                     <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                   </button>
-
-                   <button onClick={() => setShowLeaderboard(true)} className="p-1.5 md:p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group" title="Рейтинг">
-                     <Trophy className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-                   </button>
-
+                   <button onClick={() => setShowArchive(true)} className="p-1.5 md:p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title="Архив Знаний"><MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" /></button>
+                   <button onClick={() => setShowLeaderboard(true)} className="p-1.5 md:p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group" title="Рейтинг"><Trophy className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" /></button>
+                   
                    <button onClick={() => setShowDashboard(true)} className="flex items-center gap-2 pl-2 border-l border-slate-700/50">
                       <div className="flex flex-col items-end">
-                        <span className={`text-[10px] md:text-xs font-bold uppercase ${currentRank?.color}`}>
-                          {currentRank?.title.split(' ')[0]}
-                        </span>
+                        <span className={`text-[10px] md:text-xs font-bold uppercase ${currentRank?.color}`}>{currentRank?.title.split(' ')[0]}</span>
                         <span className="hidden md:block text-white font-medium text-sm leading-none">{profile?.username}</span>
-                        <div className="w-12 md:w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
-                          <div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
-                        </div>
+                        <div className="w-12 md:w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1"><div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} /></div>
                       </div>
-                      <div className="p-1.5 md:p-2 bg-slate-800 rounded-lg border border-slate-700">
-                         <User className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
-                      </div>
+                      <div className="p-1.5 md:p-2 bg-slate-800 rounded-lg border border-slate-700"><User className="w-4 h-4 md:w-5 md:h-5 text-slate-400" /></div>
                    </button>
                 </>
               ) : (
@@ -332,16 +307,15 @@ function MainApp() {
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
               
-              {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3">
                 {user ? (
                    <>
-                    {/* НОВАЯ КНОПКА ПЕРЕЗАХОДА */}
+                    {/* КНОПКА ПЕРЕЗАХОДА (Крутится если грузит) */}
                     <button 
                       onClick={manualReconnect}
                       disabled={isReconnecting}
                       className="p-3 md:p-4 bg-slate-800 border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
-                      title="Проверить активные игры (Перезаход)"
+                      title="Проверить активные игры"
                     >
                       <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
                     </button>
@@ -372,21 +346,9 @@ function MainApp() {
             </>
           )}
           
-          {view === 'modules' && selectedSector && (
-            <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />
-          )}
-
-          {view === 'reactor' && selectedModule && (
-            <Reactor 
-               module={selectedModule} 
-               onBack={handleBackToModules} 
-               onRequestAuth={() => setShowAuthModal(true)} 
-            />
-          )}
-
-          {user && view === 'pvp' && (
-            <PvPMode onBack={handleBackToMap} />
-          )}
+          {view === 'modules' && selectedSector && <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />}
+          {view === 'reactor' && selectedModule && <Reactor module={selectedModule} onBack={handleBackToModules} onRequestAuth={() => setShowAuthModal(true)} />}
+          {user && view === 'pvp' && <PvPMode onBack={handleBackToMap} />}
           
           {user && view === 'tournament_lobby' && activeTournamentId && (
             <TournamentLobby 
@@ -410,7 +372,6 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           
-          {/* МОДАЛКА ВОССТАНОВЛЕНИЯ СЕССИИ (АВТОМАТИЧЕСКАЯ) */}
           {showReconnect && (
             <ReconnectModal 
               onReconnect={handleReconnectConfirm} 
