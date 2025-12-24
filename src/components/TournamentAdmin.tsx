@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import QRCode from 'react-qr-code';
 import { TournamentBracket } from './TournamentBracket';
-import { Users, Play, Trophy, Share2, X, Crown, Copy, Loader, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
+import { Users, Play, Trophy, Share2, X, Crown, Copy, Loader, RefreshCw, Trash2, AlertTriangle, Eye, Swords } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { SpectatorModal } from './SpectatorModal'; // <--- ИМПОРТ
 
 export function TournamentAdmin({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
@@ -15,6 +16,10 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  
+  // LIVE DUELS
+  const [activeDuels, setActiveDuels] = useState<any[]>([]);
+  const [spectatingDuelId, setSpectatingDuelId] = useState<string | null>(null);
 
   // 1. Инициализация
   useEffect(() => {
@@ -23,7 +28,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
     async function initTournament() {
       if (!user) return;
 
-      // Авто-чистка старых турниров (>1 часа)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       await supabase.from('tournaments').delete()
         .eq('created_by', user.id)
@@ -32,7 +36,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
 
       await supabase.rpc('cleanup_stale_tournaments');
 
-      // Создаем новый
       const code = Math.floor(1000 + Math.random() * 9000).toString();
       const { data, error } = await supabase
         .from('tournaments')
@@ -41,8 +44,8 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
         .single();
         
       if (error) {
-        console.error('Ошибка создания турнира:', error);
-        alert('Не удалось создать турнир. Попробуйте еще раз.');
+        console.error('Ошибка создания:', error);
+        alert('Не удалось создать турнир.');
         return;
       }
         
@@ -65,29 +68,59 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
     };
   }, [user]);
 
+  // Подгрузка активных дуэлей для списка LIVE
+  useEffect(() => {
+    let duelChannel: RealtimeChannel | null = null;
+    
+    if (tournamentId && status === 'active') {
+       fetchActiveDuels();
+       
+       duelChannel = supabase
+        .channel(`admin-duels-${tournamentId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
+        () => fetchActiveDuels())
+        .subscribe();
+    }
+
+    return () => { if(duelChannel) supabase.removeChannel(duelChannel); }
+  }, [tournamentId, status]);
+
+
   async function fetchParticipants(tId: string) {
     const targetId = tId || tournamentId;
     if (!targetId) return;
 
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('tournament_participants')
       .select('*, profiles(username, mmr, clearance_level)')
       .eq('tournament_id', targetId);
     
-    if (error) {
-      console.error("Ошибка загрузки участников:", error);
-      // Не спамим алертом при каждом обновлении, только в консоль, чтобы не мешать
-    } else if (data) {
-      setParticipants(data);
-    }
+    if (data) setParticipants(data);
     setLoading(false);
   }
 
-  // 2. СТАРТ ТУРНИРА
+  async function fetchActiveDuels() {
+    if (!tournamentId) return;
+    // Берем активные дуэли с именами
+    const { data } = await supabase
+      .from('duels')
+      .select(`
+        id, status, player1_score, player2_score, round,
+        p1:profiles!duels_player1_id_fkey(username),
+        p2:profiles!duels_player2_id_fkey(username)
+      `)
+      .eq('tournament_id', tournamentId)
+      .eq('status', 'active')
+      .order('round', { ascending: false }); // Самые свежие раунды сверху
+
+    if (data) setActiveDuels(data);
+  }
+
+  // 2. СТАРТ
   async function startTournament() {
     if (!tournamentId || participants.length < 2) {
-      alert("Нужно минимум 2 участника для старта!");
+      alert("Нужно минимум 2 участника!");
       return;
     }
 
@@ -97,8 +130,8 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
       if (error) throw error;
       setStatus('active'); 
     } catch (err) {
-      console.error('Ошибка старта:', err);
-      alert('Ошибка при запуске турнира.');
+      console.error('Ошибка:', err);
+      alert('Ошибка при запуске.');
     } finally {
       setStarting(false);
     }
@@ -124,6 +157,14 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
 
   return (
     <>
+      {/* МОДАЛКА СПЕКТАТОРА */}
+      {spectatingDuelId && (
+        <SpectatorModal 
+          duelId={spectatingDuelId} 
+          onClose={() => setSpectatingDuelId(null)} 
+        />
+      )}
+
       {showConfirmClose && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -159,31 +200,66 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row">
-          {status === 'waiting' && (
-            <div className="w-full md:w-1/3 p-8 border-b md:border-b-0 md:border-r border-slate-700 flex flex-col items-center justify-center bg-slate-800/50">
-              <div className="bg-white p-4 rounded-2xl shadow-lg mb-8"><QRCode value={joinLink} size={220} /></div>
-              <div className="flex flex-col items-center gap-2 mb-8">
-                <span className="text-slate-400 text-sm uppercase tracking-wider">Код доступа</span>
-                <button onClick={() => navigator.clipboard.writeText(joinCode)} className="text-6xl font-mono font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 hover:scale-105 transition-transform">
-                  {joinCode}
-                </button>
-              </div>
-              <button 
-                disabled={participants.length < 2 || starting}
-                onClick={startTournament}
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xl rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg"
-              >
-                {starting ? <Loader className="w-6 h-6 animate-spin"/> : <Play className="w-6 h-6 fill-current" />} 
-                {starting ? 'ЗАПУСК...' : 'НАЧАТЬ БИТВУ'}
-              </button>
-              <p className="text-slate-500 text-xs mt-3 text-center">Нужно минимум 2 участника</p>
-            </div>
-          )}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          
+          {/* ЛЕВАЯ КОЛОНКА */}
+          <div className="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-slate-700 flex flex-col bg-slate-800/50 overflow-y-auto">
+            
+            {status === 'waiting' ? (
+               // РЕЖИМ ОЖИДАНИЯ: QR КОД
+               <div className="flex flex-col items-center justify-center flex-1 py-10">
+                  <div className="bg-white p-4 rounded-2xl shadow-lg mb-8"><QRCode value={joinLink} size={200} /></div>
+                  <div className="text-5xl font-mono font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-8 cursor-pointer" onClick={() => navigator.clipboard.writeText(joinCode)}>
+                    {joinCode}
+                  </div>
+                  <button 
+                    disabled={participants.length < 2 || starting}
+                    onClick={startTournament}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:opacity-50 text-white font-bold text-lg rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                  >
+                    {starting ? <Loader className="w-5 h-5 animate-spin"/> : <Play className="w-5 h-5 fill-current" />} 
+                    {starting ? 'ЗАПУСК...' : 'НАЧАТЬ'}
+                  </button>
+               </div>
+            ) : (
+               // РЕЖИМ БИТВЫ: СПИСОК LIVE МАТЧЕЙ
+               <div className="flex flex-col h-full">
+                 <div className="flex items-center gap-2 mb-4 text-white font-bold">
+                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                   ПРЯМОЙ ЭФИР ({activeDuels.length})
+                 </div>
+                 
+                 <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                   {activeDuels.map((duel) => (
+                     <div 
+                       key={duel.id}
+                       onClick={() => setSpectatingDuelId(duel.id)}
+                       className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 p-4 rounded-xl cursor-pointer transition-all group"
+                     >
+                       <div className="flex justify-between items-center text-xs text-slate-500 mb-2 font-mono">
+                         <span>R{duel.round}</span>
+                         <span className="flex items-center gap-1 group-hover:text-cyan-400"><Eye className="w-3 h-3" /> Watch</span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                         <div className="font-bold text-white truncate max-w-[80px]">{duel.p1?.username}</div>
+                         <div className="text-sm font-mono text-slate-400">{duel.player1_score} : {duel.player2_score}</div>
+                         <div className="font-bold text-white truncate max-w-[80px] text-right">{duel.p2?.username}</div>
+                       </div>
+                     </div>
+                   ))}
+                   
+                   {activeDuels.length === 0 && (
+                     <div className="text-center text-slate-500 py-10">Нет активных матчей</div>
+                   )}
+                 </div>
+               </div>
+            )}
+          </div>
 
+          {/* ПРАВАЯ КОЛОНКА (СПИСОК ИЛИ СЕТКА) */}
           <div className="flex-1 p-8 bg-slate-900 overflow-y-auto">
             {status === 'active' || status === 'finished' ? (
-               <div className="h-full">
+               <div className="h-full min-h-[400px]">
                  {tournamentId && <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={true} />}
                </div>
             ) : (
