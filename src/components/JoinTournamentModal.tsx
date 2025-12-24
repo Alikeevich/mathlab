@@ -8,11 +8,15 @@ type Props = {
 
 export function JoinTournamentModal({ onJoin, onClose }: Props) {
   const [code, setCode] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.length >= 4) {
+    if (code.length === 4) {
+      setError('');
       onJoin(code);
+    } else {
+        setError('Код должен состоять из 4 цифр');
     }
   };
 
@@ -41,11 +45,16 @@ export function JoinTournamentModal({ onJoin, onClose }: Props) {
             autoFocus
             type="text"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))} // Только цифры, макс 4
+            onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, 4));
+                setError('');
+            }}
             placeholder="0000"
             className="w-full bg-slate-900 border-2 border-slate-600 focus:border-cyan-500 rounded-xl py-4 text-center text-4xl font-mono font-bold text-white tracking-[0.5em] placeholder-slate-700 outline-none transition-all"
           />
           
+          {error && <div className="text-red-400 text-sm text-center font-bold animate-pulse">{error}</div>}
+
           <button
             type="submit"
             disabled={code.length < 4}
