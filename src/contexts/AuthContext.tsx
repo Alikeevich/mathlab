@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Функция для принудительного обновления профиля
+  // Обновление профиля вручную (для Реактора и Магазина)
   async function refreshProfile() {
     if (!user) return;
     const { data } = await supabase
@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Проверка текущей сессии
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -41,20 +42,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Слушатель изменений авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
+      // Если произошло событие ВЫХОДА - чистим все
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
         setProfile(null);
         setLoading(false);
+      } else {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProfile(session.user.id);
+        } else {
+          // Если сессии нет, но событие не SIGNED_OUT (на всякий случай)
+          setProfile(null);
+          setLoading(false);
+        }
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // REALTIME ПОДПИСКА (Автоматическое обновление)
+  // Realtime подписка на профиль
   useEffect(() => {
     if (!user) return;
 
@@ -69,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          // Мгновенно обновляем стейт при сигнале от базы
           setProfile(payload.new as Profile);
         }
       )
@@ -112,9 +121,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }
 
+  // === ИСПРАВЛЕННАЯ ФУНКЦИЯ ВЫХОДА ===
   async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      // 1. Пробуем выйти через Supabase
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Ошибка при выходе:", error);
+    } finally {
+      // 2. В ЛЮБОМ СЛУЧАЕ очищаем состояние локально
+      setUser(null);
+      setProfile(null);
+      
+      // Можно почистить localStorage, если нужно сбросить онбординг
+      // localStorage.removeItem('onboarding_seen'); 
+      
+      // Перезагрузка страницы для гарантии сброса всех стейтов App.tsx
+      // (Опционально, но надежно)
+      // window.location.reload();
+    }
   }
 
   return (

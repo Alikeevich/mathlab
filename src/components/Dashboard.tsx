@@ -91,8 +91,8 @@ export function Dashboard({ onClose }: DashboardProps) {
   }
 
   async function handleSignOut() {
-    await signOut();
-    onClose();
+    onClose(); // 1. Сначала закрываем окно
+    await signOut(); // 2. Потом выходим
   }
 
   const formatDate = (dateString: string) => {
