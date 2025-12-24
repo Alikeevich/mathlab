@@ -127,12 +127,12 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-sm">
-            СЕКТОРЫ ЗНАНИЙ
+            СЕКТОРА ЗНАНИЙ
           </h1>
           <p className="text-slate-400 text-lg max-w-2xl mx-auto font-light">
             {!user 
               ? 'Демонстрационный доступ к системам лаборатории.'
-              : 'Выберите модуль для загрузки данных в нейросеть.'
+              : 'Выберите модуль для изучения темы.'
             }
           </p>
         </div>
