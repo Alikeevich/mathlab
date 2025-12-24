@@ -22,7 +22,9 @@ import { TournamentLobby } from './components/TournamentLobby';
 import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
-import { LevelUpManager } from './components/LevelUpManager'; // Импорт есть
+import { LevelUpManager } from './components/LevelUpManager';
+// НОВЫЙ ИМПОРТ
+import { ReconnectModal } from './components/ReconnectModal';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
@@ -46,10 +48,14 @@ function MainApp() {
   const [showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
+  
+  // Состояния восстановления
+  const [showReconnect, setShowReconnect] = useState(false);
+  const [reconnectData, setReconnectData] = useState<string | null>(null);
 
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
-  // === ФУНКЦИЯ ВХОДА В ТУРНИР (Только для User) ===
+  // === ФУНКЦИЯ ВХОДА В ТУРНИР ===
   async function joinTournament(code: string) {
     if (!user) return;
     
@@ -87,23 +93,52 @@ function MainApp() {
     }
   }, [user]);
 
-  // 2. Авто-реконнект к битве
+  // 2. АВТО-РЕКОННЕКТ (Умный)
   useEffect(() => {
-    async function checkActiveDuel() {
+    async function checkActiveSession() {
       if (!user) return;
-      const { data } = await supabase
+
+      // А. Проверяем участие в ТУРНИРЕ
+      const { data: part } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .neq('tournaments.status', 'finished') // Только активные или ожидающие
+        .maybeSingle();
+
+      if (part && part.tournaments) {
+        // Если найден активный турнир — предлагаем вернуться
+        setReconnectData(part.tournament_id);
+        setShowReconnect(true); 
+        return;
+      }
+
+      // Б. Проверяем обычное PVP
+      const { data: duel } = await supabase
         .from('duels')
         .select('id')
         .eq('status', 'active')
+        .is('tournament_id', null) // Только не турнирные
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .maybeSingle();
 
-      if (data) {
+      if (duel) {
+        // В обычное PvP возвращаем молча
         setView('pvp');
       }
     }
-    checkActiveDuel();
+    
+    checkActiveSession();
   }, [user]);
+
+  // Обработчик кнопки "Вернуться" в модалке
+  const handleReconnect = () => {
+    if (reconnectData) {
+      setActiveTournamentId(reconnectData);
+      setView('tournament_lobby');
+      setShowReconnect(false);
+    }
+  };
 
   // 3. Онбординг и Встреча с Сурикатом
   useEffect(() => {
@@ -127,7 +162,6 @@ function MainApp() {
     setShowOnboarding(false);
   }
 
-  // Данные для шапки
   const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : { title: 'Гость', color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
@@ -162,12 +196,12 @@ function MainApp() {
     );
   }
 
-  // === 1. ЛЕНДИНГ (Если не вошел и не нажал Демо) ===
+  // === 1. ЛЕНДИНГ ===
   if (!user && !isGuest && !showAuthModal) {
     return <LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} />;
   }
 
-  // === 2. ОКНО ВХОДА ===
+  // === 2. ВХОД ===
   if (!user && showAuthModal) {
     return (
       <div className="relative">
@@ -177,7 +211,7 @@ function MainApp() {
     );
   }
 
-  // === 3. ГЛАВНОЕ ПРИЛОЖЕНИЕ ===
+  // === 3. ПРИЛОЖЕНИЕ ===
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 relative">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.05),transparent_70%)]" />
@@ -200,7 +234,7 @@ function MainApp() {
             
             {user ? (
               <>
-                 {/* КНОПКИ ДЛЯ ЮЗЕРА */}
+                 {/* Кнопка Суриката */}
                  {profile?.companion_name && (
                    <button 
                      onClick={() => setShowCompanion(true)}
@@ -245,9 +279,7 @@ function MainApp() {
                  </button>
               </>
             ) : (
-              // === КНОПКИ ДЛЯ ГОСТЯ ===
               <div className="flex gap-3 items-center">
-                {/* КНОПКА ДОМОЙ (ВЫХОД ИЗ ДЕМО) */}
                 <button
                   onClick={() => setIsGuest(false)}
                   className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -255,7 +287,6 @@ function MainApp() {
                 >
                   <Home className="w-5 h-5" />
                 </button>
-                
                 <button 
                   onClick={() => setShowAuthModal(true)}
                   className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-cyan-900/20"
@@ -273,9 +304,7 @@ function MainApp() {
           <>
             <LabMap onSectorSelect={handleSectorSelect} />
             
-            {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
             <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3">
-              
               {user ? (
                  <>
                   <button 
@@ -296,7 +325,6 @@ function MainApp() {
                   </button>
                  </>
               ) : (
-                // ЗАГЛУШКА ДЛЯ ГОСТЯ
                 <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md">
                    <Lock className="w-4 h-4" /> PvP и Турниры доступны после регистрации
                 </div>
@@ -317,7 +345,6 @@ function MainApp() {
           />
         )}
 
-        {/* PvP и Турниры только для User */}
         {user && view === 'pvp' && (
           <PvPMode onBack={handleBackToMap} />
         )}
@@ -343,7 +370,14 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           
-          {/* !!! ВОТ ОН: МЕНЕДЖЕР ПОВЫШЕНИЙ !!! */}
+          {/* МОДАЛКА ВОССТАНОВЛЕНИЯ СЕССИИ */}
+          {showReconnect && (
+            <ReconnectModal 
+              onReconnect={handleReconnect} 
+              onCancel={() => setShowReconnect(false)} 
+            />
+          )}
+          
           <LevelUpManager />
 
           {profile?.is_admin && (
