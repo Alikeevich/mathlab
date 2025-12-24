@@ -4,9 +4,11 @@ import Squares from './Squares';
 type Props = {
   onStartDemo: () => void;
   onLogin: () => void;
+  // Новая функция для открытия документов
+  onOpenLegal: (type: 'privacy' | 'terms') => void;
 };
 
-export function LandingPage({ onStartDemo, onLogin }: Props) {
+export function LandingPage({ onStartDemo, onLogin, onOpenLegal }: Props) {
   return (
     <div className="min-h-screen bg-[#0f172a] relative overflow-hidden flex flex-col items-center justify-center text-white font-sans selection:bg-cyan-500/30">
       
@@ -25,7 +27,7 @@ export function LandingPage({ onStartDemo, onLogin }: Props) {
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center w-full flex flex-col min-h-screen justify-center">
         
-        <div className="flex-1 flex flex-col justify-center">
+        <div className="flex-1 flex flex-col justify-center pt-20">
           {/* Логотип */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-900/30 border border-cyan-500/30 mb-8 animate-in fade-in slide-in-from-top-4 duration-700 backdrop-blur-md mx-auto">
             <Zap className="w-4 h-4 text-cyan-400" />
@@ -81,12 +83,26 @@ export function LandingPage({ onStartDemo, onLogin }: Props) {
 
         {/* ФУТЕР */}
         <div className="mt-12 mb-6 pt-6 border-t border-slate-800/60 w-full animate-in fade-in delay-700">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-slate-500 text-sm">
-            <p>© 2025 MathLab PvP. Все права защищены.</p>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             
+            {/* Левая часть: Копирайт и Юридические ссылки */}
+            <div className="flex flex-col md:flex-row items-center gap-4 text-slate-500 text-sm">
+              <p>© {new Date().getFullYear()} MathLab PvP. All rights reserved.</p>
+              
+              <div className="flex gap-4 text-xs font-medium">
+                <button onClick={() => onOpenLegal('privacy')} className="hover:text-cyan-400 transition-colors underline decoration-slate-700 underline-offset-4">
+                  Политика конфиденциальности
+                </button>
+                <button onClick={() => onOpenLegal('terms')} className="hover:text-amber-400 transition-colors underline decoration-slate-700 underline-offset-4">
+                  Условия использования
+                </button>
+              </div>
+            </div>
+            
+            {/* Правая часть: Почта */}
             <a 
               href="mailto:support@mathlabpvp.org" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 hover:text-cyan-400 transition-all border border-transparent hover:border-slate-700"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 hover:text-cyan-400 transition-all border border-transparent hover:border-slate-700 text-sm text-slate-400"
             >
               <Mail className="w-4 h-4" />
               <span className="font-mono">support@mathlabpvp.org</span>
