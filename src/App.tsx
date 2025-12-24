@@ -7,7 +7,7 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ
+import { CookieBanner } from './components/CookieBanner';
 import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
@@ -263,6 +263,7 @@ function MainApp() {
         />
         {/* Модалка Документов для Лендинга */}
         {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+        <CookieBanner />
       </>
     );
   }
@@ -270,10 +271,19 @@ function MainApp() {
   // === 2. ВХОД ===
   if (!user && showAuthModal) {
     return (
-      <div className="relative">
-         <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
-         <Auth />
-      </div>
+      <>
+        <div className="relative">
+           <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
+           {/* Передаем функцию открытия документов */}
+           <Auth onOpenLegal={(type) => setShowLegal(type)} />
+        </div>
+        
+        {/* Модалка для документов (чтобы открывалась поверх Auth) */}
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+        
+        {/* Баннер куки */}
+        <CookieBanner />
+      </>
     );
   }
 

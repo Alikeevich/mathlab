@@ -1,28 +1,41 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, UserPlus, Loader, Mail } from 'lucide-react'; // Добавил Mail
+import { LogIn, UserPlus, Loader, Mail, CheckSquare, Square } from 'lucide-react';
 
-export function Auth() {
+type Props = {
+  onOpenLegal: (type: 'privacy' | 'terms') => void;
+};
+
+export function Auth({ onOpenLegal }: Props) {
   const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  
+  // Состояние галочки
+  const [agreed, setAgreed] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (!isLogin && !agreed) {
+      setError('Необходимо принять условия соглашения');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         await signIn(email, password);
       } else {
-        if (!username.trim()) {
-          throw new Error('Имя пользователя обязательно');
-        }
+        if (!username.trim()) throw new Error('Имя пользователя обязательно');
         await signUp(email, password, username);
       }
     } catch (err) {
@@ -91,6 +104,22 @@ export function Auth() {
               />
             </div>
 
+            {/* ГАЛОЧКА СОГЛАСИЯ (ТОЛЬКО ПРИ РЕГИСТРАЦИИ) */}
+            {!isLogin && (
+              <div className="flex items-start gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setAgreed(!agreed)}
+                  className={`mt-0.5 shrink-0 transition-colors ${agreed ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-400'}`}
+                >
+                  {agreed ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                </button>
+                <div className="text-xs text-slate-400 leading-relaxed">
+                  Я соглашаюсь с <button type="button" onClick={() => onOpenLegal('terms')} className="text-cyan-400 hover:underline">Правилами использования</button> и <button type="button" onClick={() => onOpenLegal('privacy')} className="text-cyan-400 hover:underline">Политикой конфиденциальности</button>.
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                 <p className="text-red-400 text-sm">{error}</p>
@@ -99,7 +128,7 @@ export function Auth() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && !agreed)} // Блокируем кнопку
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
             >
               {loading ? (
@@ -118,6 +147,7 @@ export function Auth() {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError('');
+                setAgreed(false); // Сбрасываем галочку при переключении
               }}
               className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
             >
@@ -125,7 +155,6 @@ export function Auth() {
             </button>
           </div>
 
-          {/* ПОДВАЛ С ПОЧТОЙ */}
           <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-center">
             <a 
               href="mailto:support@mathlabpvp.org" 

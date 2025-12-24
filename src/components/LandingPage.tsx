@@ -1,14 +1,30 @@
-import { ArrowRight, Zap, Shield, Trophy, Mail } from 'lucide-react';
+import { useState } from 'react'; // Добавили useState
+import { ArrowRight, Zap, Shield, Trophy, Mail, Check } from 'lucide-react'; // Добавили Check
 import Squares from './Squares';
 
 type Props = {
   onStartDemo: () => void;
   onLogin: () => void;
-  // Новая функция для открытия документов
   onOpenLegal: (type: 'privacy' | 'terms') => void;
 };
 
 export function LandingPage({ onStartDemo, onLogin, onOpenLegal }: Props) {
+  // Состояние для анимации копирования
+  const [copied, setCopied] = useState(false);
+
+  const handleEmailClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // 1. Копируем в буфер
+    navigator.clipboard.writeText('support@mathlabpvp.org');
+    
+    // 2. Показываем галочку
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+
+    // 3. Пытаемся открыть почту (для тех, у кого есть Outlook)
+    window.location.href = 'mailto:support@mathlabpvp.org';
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] relative overflow-hidden flex flex-col items-center justify-center text-white font-sans selection:bg-cyan-500/30">
       
@@ -85,7 +101,6 @@ export function LandingPage({ onStartDemo, onLogin, onOpenLegal }: Props) {
         <div className="mt-12 mb-6 pt-6 border-t border-slate-800/60 w-full animate-in fade-in delay-700">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             
-            {/* Левая часть: Копирайт и Юридические ссылки */}
             <div className="flex flex-col md:flex-row items-center gap-4 text-slate-500 text-sm">
               <p>© {new Date().getFullYear()} MathLab PvP. All rights reserved.</p>
               
@@ -99,14 +114,24 @@ export function LandingPage({ onStartDemo, onLogin, onOpenLegal }: Props) {
               </div>
             </div>
             
-            {/* Правая часть: Почта */}
-            <a 
-              href="mailto:support@mathlabpvp.org" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 hover:text-cyan-400 transition-all border border-transparent hover:border-slate-700 text-sm text-slate-400"
+            {/* УМНАЯ КНОПКА ПОЧТЫ */}
+            <button 
+              onClick={handleEmailClick}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 hover:text-cyan-400 transition-all border border-transparent hover:border-slate-700 text-sm text-slate-400 group"
+              title="Нажмите, чтобы скопировать"
             >
-              <Mail className="w-4 h-4" />
-              <span className="font-mono">support@mathlabpvp.org</span>
-            </a>
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="font-mono text-emerald-400">Скопировано!</span>
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span className="font-mono">support@mathlabpvp.org</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
