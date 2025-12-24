@@ -12,21 +12,20 @@ export function ReconnectModal({ onReconnect, onCancel }: Props) {
         <div className="w-20 h-20 bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
           <Wifi className="w-10 h-10 text-emerald-400" />
         </div>
-        
+       
         <h2 className="text-2xl font-black text-white mb-2">НАЙДЕНА АКТИВНАЯ ИГРА</h2>
         <p className="text-slate-400 mb-8">
           Кажется, вы вылетели из турнира. Хотите вернуться в бой?
         </p>
-
         <div className="flex flex-col gap-3">
-          <button 
+          <button
             onClick={onReconnect}
             className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20"
           >
             ВЕРНУТЬСЯ <ArrowRight className="w-5 h-5" />
           </button>
-          
-          <button 
+         
+          <button
             onClick={onCancel}
             className="text-slate-500 hover:text-slate-400 text-sm py-2"
           >

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Loader, Shield } from 'lucide-react';
+import { Users, Loader, Shield, RefreshCw } from 'lucide-react';
 import { TournamentBracket } from './TournamentBracket';
 import { TournamentPlay } from './TournamentPlay';
+import { ReconnectModal } from './ReconnectModal';
 
 type LobbyProps = {
   tournamentId: string;
-  onBattleStart: () => void;
 };
 
 export function TournamentLobby({ tournamentId }: LobbyProps) {
@@ -15,8 +15,13 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   const [participants, setParticipants] = useState<any[]>([]);
   const [tournamentCode, setTournamentCode] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
-  
+ 
   const [activeDuelId, setActiveDuelId] = useState<string | null>(null);
+  
+  // ИСПРАВЛЕНИЕ: Состояние для ReconnectModal
+  const [showReconnect, setShowReconnect] = useState(false);
+  const [reconnectTournamentId, setReconnectTournamentId] = useState<string | null>(null);
+  const [reconnectDuelId, setReconnectDuelId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadInfo() {
@@ -29,35 +34,64 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       fetchParticipants();
       checkForActiveDuel();
     }
-    loadInfo();
+
+    async function checkActiveTournament() {
+      if (!user) return;
+      
+      // ИСПРАВЛЕНИЕ: Проверяем, есть ли активное участие в турнире
+      const { data: participation, error } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !participation) {
+        loadInfo();
+        return;
+      }
+
+      if (['active', 'waiting'].includes(participation.tournaments.status)) {
+        setReconnectTournamentId(participation.tournament_id);
+        // Проверяем активный дуэль
+        const { data: duel } = await supabase
+          .from('duels')
+          .select('id')
+          .eq('tournament_id', participation.tournament_id)
+          .eq('status', 'active')
+          .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+          .single();
+        if (duel) setReconnectDuelId(duel.id);
+        setShowReconnect(true); // Показываем модалку
+        return;
+      }
+      
+      // Если нет — продолжаем загрузку как раньше
+      loadInfo();
+    }
+    checkActiveTournament();
 
     const tourSub = supabase.channel(`tour-status-${tournamentId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` }, 
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` },
       (payload) => setStatus(payload.new.status))
       .subscribe();
-
     const partSub = supabase.channel(`tour-parts-${tournamentId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${tournamentId}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${tournamentId}` },
       () => fetchParticipants())
       .subscribe();
-
     const duelSub = supabase.channel(`tour-duels-${tournamentId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
       () => checkForActiveDuel())
       .subscribe();
-
     return () => {
       supabase.removeChannel(tourSub);
       supabase.removeChannel(partSub);
       supabase.removeChannel(duelSub);
     };
   }, [tournamentId, user]);
-
   async function fetchParticipants() {
     const { data } = await supabase.from('tournament_participants').select('*, profiles(username, mmr)').eq('tournament_id', tournamentId);
     if (data) setParticipants(data);
   }
-
   async function checkForActiveDuel() {
     if (!user) return;
     const { data } = await supabase
@@ -67,27 +101,46 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       .eq('status', 'active')
       .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
       .maybeSingle();
-
     if (data) {
       setActiveDuelId(data.id);
     } else {
       setActiveDuelId(null);
     }
   }
-
   // === РЕЖИМ БОЯ ===
   if (activeDuelId) {
     return (
-      <TournamentPlay 
-        duelId={activeDuelId} 
+      <TournamentPlay
+        duelId={activeDuelId}
         onFinished={() => {
-           setActiveDuelId(null); 
-           fetchParticipants(); 
-        }} 
+           setActiveDuelId(null);
+           fetchParticipants();
+        }}
       />
     );
   }
-
+  // ИСПРАВЛЕНИЕ: Рендер ReconnectModal
+  if (showReconnect) {
+    return (
+      <ReconnectModal
+        onReconnect={() => {
+          setShowReconnect(false);
+          if (reconnectDuelId) {
+            setActiveDuelId(reconnectDuelId); // Переходим в дуэль
+          } else if (reconnectTournamentId) {
+            // Здесь логика перехода в лобби турнира (например, setTournamentId или редирект)
+            // Предполагаю, что tournamentId передаётся извне; адаптируйте
+            window.location.href = `/?t=${reconnectTournamentId}`; // Или используйте router
+          }
+        }}
+        onCancel={() => {
+          setShowReconnect(false);
+          // Опционально: Удалить участие из БД
+          supabase.from('tournament_participants').delete().eq('user_id', user.id);
+        }}
+      />
+    );
+  }
   // === СЕТКА ===
   if (status === 'active' || status === 'finished') {
     return (
@@ -98,22 +151,21 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
            </div>
         )}
         <div className="flex-1 overflow-hidden">
-           <TournamentBracket 
-             tournamentId={tournamentId} 
+           <TournamentBracket
+             tournamentId={tournamentId}
              // ВАЖНО: Передаем пустую функцию, так как переход делает checkForActiveDuel выше
-             onEnterMatch={() => {}} 
+             onEnterMatch={() => {}}
            />
         </div>
       </div>
     );
   }
-
   // === ЛОББИ ===
   return (
     <div className="flex items-center justify-center h-full p-4">
       <div className="w-full max-w-5xl bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cyan-500 via-purple-500 to-cyan-500 animate-pulse" />
-        
+       
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1">
@@ -127,11 +179,19 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
             <span className="text-white font-medium animate-pulse">Ожидание организатора...</span>
           </div>
         </div>
-
         <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-800 min-h-[300px]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-slate-400 text-sm uppercase tracking-wider font-bold">Участники ({participants.length})</h3>
-            <Users className="w-5 h-5 text-slate-500" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchParticipants}
+                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                title="Обновить список"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+              <Users className="w-5 h-5 text-slate-500" />
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {participants.map((p) => (
