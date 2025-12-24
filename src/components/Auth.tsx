@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, UserPlus, Loader } from 'lucide-react';
+import { LogIn, UserPlus, Loader, Mail } from 'lucide-react'; // Добавил Mail
 
 export function Auth() {
   const { signIn, signUp } = useAuth();
@@ -33,13 +33,13 @@ export function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.1),transparent_50%)]" />
-
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
-        <div className="bg-slate-800/50 backdrop-blur-xl border border-cyan-500/30 rounded-2xl p-8 shadow-2xl">
+        
+        {/* Карточка входа */}
+        <div className="bg-slate-800/50 backdrop-blur-xl border border-cyan-500/30 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
           <div className="flex items-center justify-center mb-8">
-            <div className="bg-gradient-to-br from-cyan-400 to-blue-500 p-3 rounded-xl">
+            <div className="bg-gradient-to-br from-cyan-400 to-blue-500 p-3 rounded-xl shadow-lg shadow-cyan-500/20">
               {isLogin ? <LogIn className="w-8 h-8 text-white" /> : <UserPlus className="w-8 h-8 text-white" />}
             </div>
           </div>
@@ -54,9 +54,7 @@ export function Auth() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="block text-cyan-300 text-sm font-medium mb-2">
-                  Имя пользователя
-                </label>
+                <label className="block text-cyan-300 text-sm font-medium mb-2">Имя пользователя</label>
                 <input
                   type="text"
                   value={username}
@@ -69,9 +67,7 @@ export function Auth() {
             )}
 
             <div>
-              <label className="block text-cyan-300 text-sm font-medium mb-2">
-                Email
-              </label>
+              <label className="block text-cyan-300 text-sm font-medium mb-2">Email</label>
               <input
                 type="email"
                 value={email}
@@ -83,9 +79,7 @@ export function Auth() {
             </div>
 
             <div>
-              <label className="block text-cyan-300 text-sm font-medium mb-2">
-                Пароль
-              </label>
+              <label className="block text-cyan-300 text-sm font-medium mb-2">Пароль</label>
               <input
                 type="password"
                 value={password}
@@ -106,7 +100,7 @@ export function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
             >
               {loading ? (
                 <>
@@ -129,6 +123,17 @@ export function Auth() {
             >
               {isLogin ? 'Нет аккаунта? Зарегистрируйтесь' : 'Уже есть аккаунт? Войдите'}
             </button>
+          </div>
+
+          {/* ПОДВАЛ С ПОЧТОЙ */}
+          <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-center">
+            <a 
+              href="mailto:support@mathlabpvp.org" 
+              className="flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-colors text-xs"
+            >
+              <Mail className="w-3 h-3" />
+              <span>support@mathlabpvp.org</span>
+            </a>
           </div>
         </div>
 
