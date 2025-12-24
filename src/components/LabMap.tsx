@@ -132,7 +132,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
           <p className="text-slate-400 text-lg max-w-2xl mx-auto font-light">
             {!user 
               ? 'Демонстрационный доступ к системам лаборатории.'
-              : 'Выберите модуль для загрузки данных в нейросеть.'
+              : 'Выберите модуль для изучения темы.'
             }
           </p>
         </div>
