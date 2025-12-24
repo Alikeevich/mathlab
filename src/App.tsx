@@ -23,8 +23,10 @@ import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
 import { LevelUpManager } from './components/LevelUpManager';
+// НОВЫЙ ИМПОРТ
 import { ReconnectModal } from './components/ReconnectModal';
-// НОВЫЙ ФОН
+
+// ФОН
 import PixelBlast from './components/PixelBlast';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
@@ -99,28 +101,32 @@ function MainApp() {
     async function checkActiveSession() {
       if (!user) return;
 
+      // А. Проверяем участие в ТУРНИРЕ
       const { data: part } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
         .eq('user_id', user.id)
-        .neq('tournaments.status', 'finished')
+        .neq('tournaments.status', 'finished') // Только активные или ожидающие
         .maybeSingle();
 
       if (part && part.tournaments) {
+        // Если найден активный турнир — предлагаем вернуться
         setReconnectData(part.tournament_id);
         setShowReconnect(true); 
         return;
       }
 
+      // Б. Проверяем обычное PVP
       const { data: duel } = await supabase
         .from('duels')
         .select('id')
         .eq('status', 'active')
-        .is('tournament_id', null)
+        .is('tournament_id', null) // Только не турнирные
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .maybeSingle();
 
       if (duel) {
+        // В обычное PvP возвращаем молча
         setView('pvp');
       }
     }
@@ -128,6 +134,7 @@ function MainApp() {
     checkActiveSession();
   }, [user]);
 
+  // Обработчик кнопки "Вернуться" в модалке
   const handleReconnect = () => {
     if (reconnectData) {
       setActiveTournamentId(reconnectData);
@@ -211,7 +218,7 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
       
-      {/* ФОН PIXELBLAST (Здесь) */}
+      {/* ФОН PIXELBLAST */}
       <div className="absolute inset-0 z-0">
         <PixelBlast
           variant="circle"
@@ -232,7 +239,6 @@ function MainApp() {
           edgeFade={0.25}
           transparent
         />
-        {/* Затемнение, чтобы текст читался поверх пикселей */}
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
       </div>
 
@@ -257,10 +263,10 @@ function MainApp() {
                    {profile?.companion_name && (
                      <button 
                        onClick={() => setShowCompanion(true)}
-                       className="relative group p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors mr-2"
+                       className="relative group p-1 bg-slate-800/50 hover:bg-slate-700 border border-slate-700 hover:border-amber-500/50 rounded-xl transition-all mr-1 shadow-sm"
                        title={`Домик ${profile.companion_name}`}
                      >
-                       <div className="w-6 h-6 md:w-8 md:h-8 flex items-center justify-center">
+                       <div className="w-8 h-8 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
                           <img 
                             src="/meerkat/avatar.png" 
                             alt="Pet" 
@@ -274,26 +280,26 @@ function MainApp() {
                      </button>
                    )}
 
-                   <button onClick={() => setShowArchive(true)} className="p-1.5 md:p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title="Архив Знаний">
-                     <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                   <button onClick={() => setShowArchive(true)} className="p-2.5 bg-slate-800/50 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 rounded-xl transition-all group" title="Архив Знаний">
+                     <MonitorPlay className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
                    </button>
 
-                   <button onClick={() => setShowLeaderboard(true)} className="p-1.5 md:p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group" title="Рейтинг">
-                     <Trophy className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+                   <button onClick={() => setShowLeaderboard(true)} className="p-2.5 bg-slate-800/50 hover:bg-slate-700 border border-slate-700 hover:border-amber-500/50 rounded-xl transition-all group" title="Рейтинг">
+                     <Trophy className="w-5 h-5 text-slate-400 group-hover:text-amber-400 transition-colors" />
                    </button>
 
-                   <button onClick={() => setShowDashboard(true)} className="flex items-center gap-2 pl-2 border-l border-slate-700/50">
-                      <div className="flex flex-col items-end">
-                        <span className={`text-[10px] md:text-xs font-bold uppercase ${currentRank?.color}`}>
+                   <button onClick={() => setShowDashboard(true)} className="flex items-center gap-3 pl-3 border-l border-slate-800 ml-1">
+                      <div className="hidden md:flex flex-col items-end">
+                        <span className={`text-xs font-bold uppercase ${currentRank?.color}`}>
                           {currentRank?.title.split(' ')[0]}
                         </span>
-                        <span className="hidden md:block text-white font-medium text-sm leading-none">{profile?.username}</span>
-                        <div className="w-12 md:w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                        <span className="text-white font-medium text-sm leading-none">{profile?.username}</span>
+                        <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
                           <div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                         </div>
                       </div>
-                      <div className="p-1.5 md:p-2 bg-slate-800 rounded-lg border border-slate-700">
-                         <User className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
+                      <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700 hover:border-slate-500 transition-colors">
+                         <User className="w-5 h-5 text-slate-400" />
                       </div>
                    </button>
                 </>
