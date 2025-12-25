@@ -222,6 +222,7 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
+          {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
           <LevelUpManager />
 
           {/* КНОПКИ АДМИНА / УЧИТЕЛЯ (Показываем и тем, и другим) */}
