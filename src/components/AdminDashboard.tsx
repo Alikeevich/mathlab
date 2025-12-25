@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Users, Megaphone, Search, Shield, GraduationCap, User as UserIcon, Send, CheckCircle } from 'lucide-react';
+import { X, Users, Megaphone, Search, Shield, GraduationCap, User as UserIcon, Send, CheckCircle, ChevronDown } from 'lucide-react';
 
 type Props = {
   onClose: () => void;
@@ -31,7 +31,7 @@ export function AdminDashboard({ onClose }: Props) {
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100); // Ограничим 100, чтобы не грузить базу, позже можно добавить пагинацию
+      .limit(100); 
     if (data) setAllUsers(data);
     setLoading(false);
   }
@@ -43,7 +43,6 @@ export function AdminDashboard({ onClose }: Props) {
       .eq('id', userId);
     
     if (!error) {
-      // Обновляем локально
       setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } else {
       alert('Ошибка обновления роли');
@@ -61,7 +60,7 @@ export function AdminDashboard({ onClose }: Props) {
         target_id: targetType === 'specific' ? targetUserId : null,
         msg_title: msgTitle,
         msg_body: msgBody,
-        msg_type: 'info' // Можно добавить выбор типа (success, warning)
+        msg_type: 'info'
       });
 
       if (error) throw error;
@@ -77,7 +76,6 @@ export function AdminDashboard({ onClose }: Props) {
     }
   }
 
-  // Фильтрация юзеров
   const filteredUsers = allUsers.filter(u => 
     u.username?.toLowerCase().includes(search.toLowerCase()) || 
     u.id?.includes(search)
@@ -87,14 +85,14 @@ export function AdminDashboard({ onClose }: Props) {
     <div className="fixed inset-0 z-[200] bg-slate-900 z-[100] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
       
       {/* ШАПКА */}
-      <div className="p-6 border-b border-cyan-500/20 flex justify-between items-center bg-slate-800 shrink-0">
+      <div className="p-4 md:p-6 border-b border-cyan-500/20 flex justify-between items-center bg-slate-800 shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/30">
-            <Shield className="w-6 h-6 text-red-500" />
+            <Shield className="w-5 h-5 md:w-6 md:h-6 text-red-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Админ-центр</h2>
-            <p className="text-slate-400 text-xs uppercase tracking-widest">Управление платформой</p>
+            <h2 className="text-lg md:text-2xl font-bold text-white">Админ-центр</h2>
+            <p className="text-slate-400 text-[10px] md:text-xs uppercase tracking-widest hidden sm:block">Управление платформой</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
@@ -102,36 +100,37 @@ export function AdminDashboard({ onClose }: Props) {
         </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         
-        {/* САЙДБАР (Меню) */}
-        <div className="w-64 bg-slate-800/50 border-r border-slate-700 p-4 flex flex-col gap-2">
+        {/* НАВИГАЦИЯ (АДАПТИВНАЯ) */}
+        {/* На ПК - колонка слева. На телефоне - ряд кнопок сверху. */}
+        <div className="w-full md:w-64 bg-slate-800/50 border-b md:border-b-0 md:border-r border-slate-700 p-2 md:p-4 flex flex-row md:flex-col gap-2 shrink-0 overflow-x-auto">
           <button 
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${activeTab === 'users' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+            className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-2 md:py-3 rounded-xl transition-all font-bold text-sm md:text-base whitespace-nowrap ${activeTab === 'users' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
           >
-            <Users className="w-5 h-5" /> Пользователи
+            <Users className="w-4 h-4 md:w-5 md:h-5" /> Пользователи
           </button>
           <button 
             onClick={() => setActiveTab('broadcast')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${activeTab === 'broadcast' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+            className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-2 md:py-3 rounded-xl transition-all font-bold text-sm md:text-base whitespace-nowrap ${activeTab === 'broadcast' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
           >
-            <Megaphone className="w-5 h-5" /> Рассылка
+            <Megaphone className="w-4 h-4 md:w-5 md:h-5" /> Рассылка
           </button>
         </div>
 
         {/* КОНТЕНТ */}
-        <div className="flex-1 bg-slate-900 p-8 overflow-y-auto">
+        <div className="flex-1 bg-slate-900 p-4 md:p-8 overflow-y-auto">
           
           {/* === Вкладка ПОЛЬЗОВАТЕЛИ === */}
           {activeTab === 'users' && (
             <div className="max-w-5xl mx-auto">
-              <div className="flex gap-4 mb-6">
+              <div className="flex gap-4 mb-4 md:mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                   <input 
                     type="text" 
-                    placeholder="Поиск по имени или ID..." 
+                    placeholder="Поиск..." 
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:border-cyan-500 outline-none"
@@ -139,7 +138,8 @@ export function AdminDashboard({ onClose }: Props) {
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden">
+              {/* ВЕРСИЯ ДЛЯ ПК (ТАБЛИЦА) - Скрыта на мобильных */}
+              <div className="hidden md:block bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden">
                 <table className="w-full text-left">
                   <thead className="bg-slate-800 text-slate-400 uppercase text-xs">
                     <tr>
@@ -166,7 +166,7 @@ export function AdminDashboard({ onClose }: Props) {
                         </td>
                         <td className="p-4 text-right">
                           <select 
-                            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-cyan-500"
+                            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-cyan-500 cursor-pointer"
                             value={u.role || 'student'}
                             onChange={(e) => updateUserRole(u.id, e.target.value)}
                           >
@@ -179,32 +179,67 @@ export function AdminDashboard({ onClose }: Props) {
                     ))}
                   </tbody>
                 </table>
-                {filteredUsers.length === 0 && (
-                  <div className="p-8 text-center text-slate-500">Никого не найдено</div>
-                )}
               </div>
+
+              {/* ВЕРСИЯ ДЛЯ ТЕЛЕФОНА (КАРТОЧКИ) - Скрыта на ПК */}
+              <div className="md:hidden space-y-4">
+                {filteredUsers.map(u => (
+                  <div key={u.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-bold text-white text-lg">{u.username}</div>
+                        <div className="text-[10px] text-slate-500 font-mono break-all">{u.id}</div>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                          u.role === 'admin' ? 'bg-red-500/20 text-red-400' :
+                          u.role === 'teacher' ? 'bg-amber-500/20 text-amber-400' :
+                          'bg-slate-700 text-slate-400'
+                        }`}>
+                          {u.role || 'student'}
+                      </span>
+                    </div>
+                    
+                    <div className="pt-3 border-t border-slate-700">
+                      <label className="text-xs text-slate-400 mb-1 block">Изменить роль:</label>
+                      <select 
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                          value={u.role || 'student'}
+                          onChange={(e) => updateUserRole(u.id, e.target.value)}
+                        >
+                          <option value="student">Ученик</option>
+                          <option value="teacher">Учитель</option>
+                          <option value="admin">Админ</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {filteredUsers.length === 0 && (
+                <div className="p-8 text-center text-slate-500">Никого не найдено</div>
+              )}
             </div>
           )}
 
           {/* === Вкладка РАССЫЛКА === */}
           {activeTab === 'broadcast' && (
             <div className="max-w-2xl mx-auto">
-              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 md:p-8">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-6 flex items-center gap-2">
                   <Megaphone className="w-6 h-6 text-cyan-400" /> Отправить уведомление
                 </h3>
 
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   
                   {/* Выбор получателя */}
                   <div>
                     <label className="block text-slate-400 text-sm font-bold mb-2">Получатели</label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {['all', 'teachers', 'students', 'specific'].map(type => (
                         <button
                           key={type}
                           onClick={() => setTargetType(type)}
-                          className={`py-2 px-3 rounded-lg text-sm font-bold border transition-all ${
+                          className={`py-2 px-3 rounded-lg text-xs md:text-sm font-bold border transition-all ${
                             targetType === type 
                               ? 'bg-cyan-600 border-cyan-500 text-white' 
                               : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
@@ -216,7 +251,6 @@ export function AdminDashboard({ onClose }: Props) {
                     </div>
                   </div>
 
-                  {/* Если выбрано "По ID" */}
                   {targetType === 'specific' && (
                     <div className="animate-in fade-in slide-in-from-top-2">
                       <label className="block text-slate-400 text-sm font-bold mb-2">ID Пользователя</label>
@@ -225,7 +259,7 @@ export function AdminDashboard({ onClose }: Props) {
                         value={targetUserId}
                         onChange={(e) => setTargetUserId(e.target.value)}
                         placeholder="Вставьте UUID..."
-                        className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white font-mono"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white font-mono text-sm"
                       />
                     </div>
                   )}
