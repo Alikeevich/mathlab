@@ -60,7 +60,11 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     async function fetchProblems() {
       setLoading(true);
       try {
-        const { data } = await supabase.from('problems').select('*').eq('module_id', module.id);
+        const { data } = await supabase
+          .from('problems')
+          .select('*')
+          .eq('module_id', module.id);
+        
         if (data && data.length > 0) {
           const shuffled = data.sort(() => 0.5 - Math.random());
           setProblems(shuffled);
@@ -73,12 +77,13 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     fetchProblems();
   }, [module.id]);
 
-  // === 2. СМЕНА ЗАДАЧИ ===
+  // === 2. ПЕРЕХОД К СЛЕДУЮЩЕЙ ===
   function loadNextProblem() {
     if (!user && problemsSolved >= GUEST_LIMIT) {
       setShowPaywall(true);
       return;
     }
+
     if (problems.length === 0) return;
     
     const randomProblem = problems[Math.floor(Math.random() * problems.length)];
@@ -88,25 +93,23 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setShowHint(false);
     setStartTime(Date.now());
     
-    // Очистка
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
-      // Здесь фокус нужен, так как это начало новой задачи
-      // preventScroll: true ОБЯЗАТЕЛЕН
+      // Здесь фокус нужен, чтобы начать ввод сразу. preventScroll критичен.
       setTimeout(() => {
         if (mfRef.current) mfRef.current.focus({ preventScroll: true });
       }, 50);
     }
   }
 
-  // === 3. ОБРАБОТКА НАЖАТИЙ (ИСПРАВЛЕНО) ===
+  // === 3. УПРАВЛЕНИЕ КЛАВИАТУРОЙ ===
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
-    // УБРАЛ ВЫЗОВ .focus() ОТСЮДА! 
-    // Клавиатура сама держит фокус через preventDefault.
-    // Браузер теперь не будет пытаться скроллить к полю.
+    // ВЕРНУЛИ ЭТУ СТРОКУ: Принудительный, но МЯГКИЙ фокус перед вводом.
+    // Это стабилизирует поведение при вводе во вложенные структуры (логарифмы).
+    mfRef.current.focus({ preventScroll: true });
 
     if (cmd === 'insert') {
       mfRef.current.executeCommand(['insert', arg]);
@@ -117,6 +120,8 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
+    // И здесь тоже, чтобы удаление не дергало экран
+    mfRef.current.focus({ preventScroll: true });
     mfRef.current.executeCommand(['deleteBackward']);
   };
 
@@ -124,13 +129,10 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     if (!mfRef.current) return;
     mfRef.current.setValue('');
     setUserAnswer('');
-    // При полной очистке можно мягко вернуть фокус, если он пропал
-    if (document.activeElement !== mfRef.current) {
-       mfRef.current.focus({ preventScroll: true });
-    }
+    mfRef.current.focus({ preventScroll: true });
   };
 
-  // === 4. ОТПРАВКА ===
+  // === 4. ОТПРАВКА ОТВЕТА ===
   async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!currentProblem) return;
@@ -144,14 +146,21 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
     if (user) {
       await supabase.from('experiments').insert({
-        user_id: user.id, module_id: module.id, problem_id: currentProblem.id, problem_type: currentProblem.type, correct: isCorrect, time_spent: timeSpent,
+        user_id: user.id,
+        module_id: module.id,
+        problem_id: currentProblem.id, 
+        problem_type: currentProblem.type,
+        correct: isCorrect,
+        time_spent: timeSpent,
       });
 
       if (isCorrect) {
         setTimeout(() => refreshProfile(), 100);
+        
         const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
         const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
         const newPercentage = Math.min(newExperiments * 10, 100);
+
         if (progressData) {
           await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
         } else {
@@ -159,7 +168,10 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
         }
       }
     }
-    setTimeout(() => { loadNextProblem(); }, 2000);
+
+    setTimeout(() => {
+      loadNextProblem();
+    }, 2000);
   }
 
   const successRate = problemsSolved > 0 ? ((correctCount / problemsSolved) * 100).toFixed(0) : 0;
@@ -169,12 +181,21 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   if (showPaywall) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in zoom-in duration-300">
-        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl">
-          <Lock className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600" />
+          <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/50">
+            <Lock className="w-10 h-10 text-amber-400" />
+          </div>
           <h2 className="text-2xl font-bold text-white mb-3">Демо-режим завершен</h2>
-          <p className="text-slate-400 mb-8">Создайте аккаунт для продолжения.</p>
-          <button onClick={onRequestAuth} className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl">Создать аккаунт</button>
-          <button onClick={onBack} className="mt-4 text-slate-500 hover:text-white text-sm">Вернуться</button>
+          <p className="text-slate-400 mb-8">
+            Вы решили {GUEST_LIMIT} задачи! Чтобы продолжить обучение, сохранять прогресс и открыть PvP — нужно создать аккаунт. Это бесплатно.
+          </p>
+          <button onClick={onRequestAuth} className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105">
+            Создать аккаунт
+          </button>
+          <button onClick={onBack} className="mt-4 text-slate-500 hover:text-white text-sm">
+            Вернуться в меню
+          </button>
         </div>
       </div>
     );
@@ -184,14 +205,21 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     <div className="w-full h-full overflow-y-auto pb-20 custom-scrollbar">
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         
+        {/* Хедер */}
         <div className="flex justify-between items-center mb-6 md:mb-8">
            <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group px-3 py-2 rounded-lg hover:bg-slate-800">
              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
              <span className="font-bold">Назад</span>
            </button>
-           {!user && <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold font-mono">ДЕМО: {problemsSolved}/{GUEST_LIMIT}</div>}
+
+           {!user && (
+             <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold font-mono">
+               ДЕМО: {problemsSolved}/{GUEST_LIMIT}
+             </div>
+           )}
         </div>
 
+        {/* Заголовок */}
         <div className="mb-6 md:mb-8">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg animate-pulse">
@@ -219,6 +247,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
           </div>
         </div>
 
+        {/* Карточка задачи */}
         {currentProblem ? (
           <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -239,7 +268,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
               </h2>
             </div>
 
-            {/* ЗОНА РЕШЕНИЯ */}
+            {/* ЗОНА ВВОДА */}
             {result === null ? (
               <div className="relative z-10">
                 <div className="mb-4">
@@ -247,7 +276,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                     Ввод решения
                   </label>
                   
-                  {/* === ВВОД (MathInput) === */}
                   <MathInput 
                     value={userAnswer}
                     onChange={setUserAnswer}
@@ -256,7 +284,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                   />
                 </div>
 
-                {/* === КЛАВИАТУРА === */}
                 <MathKeypad 
                   onCommand={handleKeypadCommand} 
                   onDelete={handleKeypadDelete}
