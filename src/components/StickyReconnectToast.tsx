@@ -21,11 +21,10 @@ export function StickyReconnectToast({ type, onReconnect, onDecline }: Props) {
                src="/meerkat/thinking.png" 
                alt="Meerkat" 
                className="w-14 h-14 object-contain mt-2" 
-               // Фолбэк на случай отсутствия картинки
+               // Фолбэк
                onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
              />
           </div>
-          {/* Индикатор статуса */}
           <div className="absolute -bottom-1 -right-1 bg-red-500 w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-bounce">
             <AlertTriangle className="w-3 h-3 text-white" />
           </div>
@@ -37,7 +36,7 @@ export function StickyReconnectToast({ type, onReconnect, onDecline }: Props) {
             Потеряна связь!
           </h4>
           <p className="text-slate-400 text-sm leading-snug mb-3">
-            Я нашел твой незавершенный {type === 'tournament' ? 'турнирный' : 'PvP'} матч. Вернемся в бой?
+            Найден активный {type === 'tournament' ? 'турнирный' : 'PvP'} матч. Вернуться?
           </p>
 
           <div className="flex gap-2">
@@ -45,7 +44,7 @@ export function StickyReconnectToast({ type, onReconnect, onDecline }: Props) {
               onClick={onReconnect}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
             >
-              <Play className="w-3 h-3 fill-current" /> ДА, ВЕРНУТЬСЯ
+              <Play className="w-3 h-3 fill-current" /> ДА
             </button>
             <button 
               onClick={onDecline}
