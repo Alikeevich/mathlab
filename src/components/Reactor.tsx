@@ -82,6 +82,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
   // === 2. ПЕРЕХОД К СЛЕДУЮЩЕЙ ===
   function loadNextProblem() {
+    // Лимит для гостей
     if (!user && problemsSolved >= GUEST_LIMIT) {
       setShowPaywall(true);
       return;
@@ -100,26 +101,37 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
-      // Не форсируем фокус, чтобы не вызывать клавиатуру принудительно
+      // Используем мягкий фокус, чтобы убедиться, что курсор активен
+      // preventScroll: true критически важен, чтобы экран не прыгал
+      setTimeout(() => {
+        if (mfRef.current) mfRef.current.focus({ preventScroll: true });
+      }, 50);
     }
   }
 
-  // === 3. УПРАВЛЕНИЕ СПЕЦ-КЛАВИАТУРОЙ ===
+  // === 3. УПРАВЛЕНИЕ КЛАВИАТУРОЙ ===
+  // Эта функция вызывается, когда ты жмешь на кнопки (цифры, sin, log и т.д.)
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
+    // Перед вводом убеждаемся, что фокус в поле, но без скролла
+    if (document.activeElement !== mfRef.current) {
+       mfRef.current.focus({ preventScroll: true });
+    }
+
     if (cmd === 'insert') {
       mfRef.current.executeCommand(['insert', arg]);
     } else if (cmd === 'perform') {
       mfRef.current.executeCommand([arg]);
     }
-    
-    // Фокус остается в поле благодаря preventDefault в MathKeypad,
-    // поэтому здесь мы его не вызываем, чтобы не триггерить скачки экрана.
   };
 
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
+    // Фокусируемся перед удалением
+    if (document.activeElement !== mfRef.current) {
+       mfRef.current.focus({ preventScroll: true });
+    }
     mfRef.current.executeCommand(['deleteBackward']);
   };
 
@@ -127,13 +139,15 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     if (!mfRef.current) return;
     mfRef.current.setValue('');
     setUserAnswer('');
+    mfRef.current.focus({ preventScroll: true });
   };
 
-  // === 4. ПРОВЕРКА ОТВЕТА ===
+  // === 4. ОТПРАВКА ОТВЕТА ===
   async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!currentProblem) return;
 
+    // MathLive выдает LaTeX, наша функция checkAnswer его понимает
     const isCorrect = checkAnswer(userAnswer, currentProblem.answer);
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
@@ -156,7 +170,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
         
         const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
         const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
-        const newPercentage = Math.min(newExperiments * 10, 100);
+        const newPercentage = Math.min(newExperiments * 10, 100); // 10 задач = 100%
 
         if (progressData) {
           await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
@@ -166,7 +180,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
       }
     }
 
-    // Авто-переход
+    // Авто-переход к следующей задаче
     setTimeout(() => {
       loadNextProblem();
     }, 2000);
@@ -189,7 +203,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
           
           <h2 className="text-2xl font-bold text-white mb-3">Демо-режим завершен</h2>
           <p className="text-slate-400 mb-8">
-            Вы решили {GUEST_LIMIT} задачи! Чтобы продолжить, создайте бесплатный аккаунт.
+            Вы решили {GUEST_LIMIT} задачи! Чтобы продолжить обучение, сохранять прогресс и открыть PvP — нужно создать аккаунт. Это бесплатно.
           </p>
 
           <button 
@@ -207,7 +221,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     );
   }
 
-  // === РЕНДЕР ===
+  // === РЕНДЕР ИНТЕРФЕЙСА ===
   return (
     <div className="w-full h-full overflow-y-auto pb-20 custom-scrollbar">
       <div className="max-w-4xl mx-auto p-4 md:p-8">
@@ -254,6 +268,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
           </div>
         </div>
 
+        {/* Карточка задачи */}
         {currentProblem ? (
           <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -274,7 +289,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
               </h2>
             </div>
 
-            {/* ЗОНА РЕШЕНИЯ */}
+            {/* ЗОНА ВВОДА (ЕСЛИ НЕТ РЕЗУЛЬТАТА) */}
             {result === null ? (
               <div className="relative z-10">
                 <div className="mb-4">
@@ -282,7 +297,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                     Ввод решения
                   </label>
                   
-                  {/* === MATHLIVE INPUT === */}
+                  {/* === MATHLIVE INPUT (ОТКЛЮЧЕНА СИСТЕМНАЯ КЛАВА) === */}
                   <MathInput 
                     value={userAnswer}
                     onChange={setUserAnswer}
@@ -291,7 +306,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                   />
                 </div>
 
-                {/* === НАША СПЕЦ-КЛАВИАТУРА === */}
+                {/* === ПОЛНАЯ КАСТОМНАЯ КЛАВИАТУРА === */}
                 <MathKeypad 
                   onCommand={handleKeypadCommand} 
                   onDelete={handleKeypadDelete}
@@ -300,12 +315,15 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                 />
 
                 <div className="flex justify-end gap-3 pt-4">
+                    {/* Чат суриката */}
                     {user && (
                       <button type="button" onClick={() => setShowChat(true)} className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-colors">
                         <MessageSquare className="w-5 h-5" />
                         <span className="hidden sm:inline text-sm font-bold">Сурикат</span>
                       </button>
                     )}
+
+                    {/* Подсказка */}
                     {!showHint && currentProblem.hint && (
                       <button type="button" onClick={() => setShowHint(true)} className="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl transition-colors">
                         ?
@@ -321,7 +339,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                 )}
               </div>
             ) : (
-              // ЗОНА РЕЗУЛЬТАТА
+              // ЗОНА РЕЗУЛЬТАТА (ПОСЛЕ ОТВЕТА)
               <div className={`p-6 rounded-2xl border-2 flex items-center gap-4 animate-in zoom-in duration-300 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
                 <div className={`p-3 rounded-full shrink-0 ${result === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
                   {result === 'correct' ? (
