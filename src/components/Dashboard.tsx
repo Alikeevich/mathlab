@@ -4,7 +4,6 @@ import { supabase, Achievement } from '../lib/supabase';
 import {
   User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, XCircle, X, Mail, ShieldCheck
 } from 'lucide-react';
-// Импортируем модалку учителя (убедись, что файл BecomeTeacherModal.tsx создан!)
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 
 type DashboardProps = {
@@ -44,7 +43,7 @@ export function Dashboard({ onClose }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
-  const [showTeacherModal, setShowTeacherModal] = useState(false); // Стейт для модалки
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
 
   useEffect(() => {
     loadAchievements();
@@ -106,7 +105,7 @@ export function Dashboard({ onClose }: DashboardProps) {
 
           <div className="flex gap-3">
             
-            {/* КНОПКА "Я УЧИТЕЛЬ" (Только если еще не учитель и не админ) */}
+            {/* КНОПКА "Я УЧИТЕЛЬ" */}
             {profile && profile.role !== 'teacher' && !profile.is_admin && (
               <button
                 onClick={() => setShowTeacherModal(true)}
@@ -149,6 +148,7 @@ export function Dashboard({ onClose }: DashboardProps) {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               
+              {/* ПРОФИЛЬ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4 md:p-6 relative overflow-hidden">
                 <div className="flex items-center gap-3 mb-3 relative z-10">
                   <div className="p-2 bg-cyan-500/20 rounded-lg">
@@ -176,6 +176,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                 )}
               </div>
 
+              {/* УРОВЕНЬ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -186,6 +187,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                 <div className="text-2xl font-bold text-white">LVL {profile.clearance_level}</div>
               </div>
 
+              {/* ОПЫТ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-emerald-500/20 rounded-lg">
@@ -196,6 +198,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                 <div className="text-2xl font-bold text-white">{profile.total_experiments}</div>
               </div>
 
+              {/* ТОЧНОСТЬ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -208,6 +211,7 @@ export function Dashboard({ onClose }: DashboardProps) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8">
+              {/* ДОСТИЖЕНИЯ */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Trophy className="w-5 h-5 text-amber-400" />
@@ -243,6 +247,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                 </div>
               </div>
 
+              {/* ИСТОРИЯ */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Clock className="w-5 h-5 text-cyan-400" />
