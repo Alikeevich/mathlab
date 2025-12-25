@@ -7,8 +7,8 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ (Menu убрали, оно теперь внутри Header)
-import { Settings, Zap, Crown, Keyboard, Lock, RotateCcw } from 'lucide-react';
+// ИКОНКИ
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -27,7 +27,7 @@ import { ReconnectModal } from './components/ReconnectModal';
 import { LegalModal } from './components/LegalModal';
 import PixelBlast from './components/PixelBlast';
 
-// ИМПОРТ ХЕДЕРА
+// Импорт Header
 import { Header } from './components/Header';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
@@ -38,9 +38,9 @@ function MainApp() {
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   
+  // Состояния
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -50,12 +50,11 @@ function MainApp() {
   const [showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
-  
   const [showReconnect, setShowReconnect] = useState(false);
-  const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
 
+  const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
   // === ФУНКЦИЯ ВХОДА В ТУРНИР ===
@@ -69,7 +68,7 @@ function MainApp() {
       setActiveTournamentId(tour.id);
       setView('tournament_lobby');
     } else {
-      alert("Турнир не найден!");
+      alert("Турнир с таким кодом не найден!");
     }
   }
 
@@ -110,9 +109,13 @@ function MainApp() {
   };
   const handleReconnectCancel = async () => { setShowReconnect(false); };
 
+  // АВТО-ОТКРЫТИЕ АДМИНКИ (ЕСЛИ УЧИТЕЛЬ)
   useEffect(() => {
     async function checkHosting() {
-      if (!user || !profile?.is_admin) return;
+      if (!user) return;
+      // Проверяем: админ или учитель
+      if (!profile?.is_admin && profile?.role !== 'teacher') return;
+
       const { data } = await supabase.from('tournaments').select('id').eq('created_by', user.id).in('status', ['waiting', 'active']).maybeSingle();
       if (data) setShowTournamentAdmin(true);
     }
@@ -133,7 +136,7 @@ function MainApp() {
   function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
   function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
   function handleBackToMap() {
-    if (activeTournamentId && view === 'pvp') { setView('tournament_lobby'); } 
+    if (activeTournamentId && view === 'pvp') setView('tournament_lobby');
     else { setView('map'); setSelectedSector(null); setActiveTournamentId(null); }
   }
   function handleBackToModules() { setView('modules'); setSelectedModule(null); }
@@ -153,7 +156,6 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
-      
       <div className="absolute inset-0 z-0">
         <PixelBlast variant="circle" pixelSize={6} color="#B19EEF" patternScale={3} patternDensity={1.2} pixelSizeJitter={0.5} enableRipples rippleSpeed={0.4} rippleThickness={0.12} rippleIntensityScale={1.5} liquid liquidStrength={0.12} liquidRadius={1.2} liquidWobbleSpeed={5} speed={0.6} edgeFade={0.25} transparent />
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
@@ -161,7 +163,7 @@ function MainApp() {
 
       <div className="relative z-10 h-full flex flex-col">
         
-        {/* === ЗДЕСЬ ТЕПЕРЬ ПОДКЛЮЧЕН HEADER === */}
+        {/* ХЕДЕР */}
         <Header 
           user={user} 
           profile={profile} 
@@ -220,13 +222,17 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
-          
           <LevelUpManager />
 
-          {profile?.is_admin && (
+          {/* КНОПКИ АДМИНА / УЧИТЕЛЯ (Показываем и тем, и другим) */}
+          {(profile?.is_admin || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
-              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
-              <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm"><Settings className="w-6 h-6" /></button>
+              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm" title="Турниры"><Crown className="w-6 h-6" /></button>
+              
+              {/* Терминал Архитектора только для Админа */}
+              {profile?.is_admin && (
+                <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm" title="Добавить задачу"><Settings className="w-6 h-6" /></button>
+              )}
             </div>
           )}
         </>

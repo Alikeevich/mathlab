@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
 import {
-  User, LogOut, Trophy, Target, TrendingUp,
-  Award, Zap, Clock, CheckCircle2, XCircle, X, Mail
+  User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, XCircle, X, Mail, ShieldCheck
 } from 'lucide-react';
+// Импортируем модалку учителя (убедись, что файл BecomeTeacherModal.tsx создан!)
+import { BecomeTeacherModal } from './BecomeTeacherModal';
 
 type DashboardProps = {
   onClose: () => void;
@@ -43,6 +44,7 @@ export function Dashboard({ onClose }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
+  const [showTeacherModal, setShowTeacherModal] = useState(false); // Стейт для модалки
 
   useEffect(() => {
     loadAchievements();
@@ -103,6 +105,18 @@ export function Dashboard({ onClose }: DashboardProps) {
           </div>
 
           <div className="flex gap-3">
+            
+            {/* КНОПКА "Я УЧИТЕЛЬ" (Только если еще не учитель и не админ) */}
+            {profile && profile.role !== 'teacher' && !profile.is_admin && (
+              <button
+                onClick={() => setShowTeacherModal(true)}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Я учитель</span>
+              </button>
+            )}
+
             <button
               onClick={onClose}
               className="hidden md:block px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
@@ -117,6 +131,18 @@ export function Dashboard({ onClose }: DashboardProps) {
               Выйти
             </button>
           </div>
+          
+          {/* Мобильная кнопка учителя */}
+          {profile && profile.role !== 'teacher' && !profile.is_admin && (
+              <button
+                onClick={() => setShowTeacherModal(true)}
+                className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Я учитель</span>
+              </button>
+          )}
+
         </div>
 
         {profile && (
@@ -128,7 +154,9 @@ export function Dashboard({ onClose }: DashboardProps) {
                   <div className="p-2 bg-cyan-500/20 rounded-lg">
                     <User className="w-5 h-5 text-cyan-400" />
                   </div>
-                  <div className="text-cyan-400/60 text-xs md:text-sm uppercase tracking-wider">Сотрудник</div>
+                  <div className="text-cyan-400/60 text-xs md:text-sm uppercase tracking-wider">
+                    {profile.role === 'teacher' ? 'Учитель' : 'Сотрудник'}
+                  </div>
                 </div>
                 <div className="text-lg md:text-xl font-bold text-white truncate relative z-10">{profile.username}</div>
                 
@@ -138,6 +166,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                        src="/meerkat/avatar.png" 
                        alt="Pet" 
                        className="w-14 h-14 object-contain drop-shadow-md"
+                       onError={(e) => { e.currentTarget.style.display='none'; }}
                      />
                      <div>
                        <div className="text-[10px] text-amber-400/60 font-mono uppercase tracking-wider">Компаньон</div>
@@ -266,7 +295,7 @@ export function Dashboard({ onClose }: DashboardProps) {
               </div>
             </div>
 
-            {/* НОВЫЙ БЛОК: ТЕХПОДДЕРЖКА */}
+            {/* ТЕХПОДДЕРЖКА */}
             <div className="mt-8 pt-6 border-t border-slate-700 flex justify-center">
               <a 
                 href="mailto:support@mathlabpvp.org?subject=Вопрос по MathLab"
@@ -279,6 +308,9 @@ export function Dashboard({ onClose }: DashboardProps) {
 
           </>
         )}
+        
+        {/* Рендер модалки учителя */}
+        {showTeacherModal && <BecomeTeacherModal onClose={() => setShowTeacherModal(false)} />}
       </div>
     </div>
   );
