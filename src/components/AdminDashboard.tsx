@@ -1,0 +1,271 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { X, Users, Megaphone, Search, Shield, GraduationCap, User as UserIcon, Send, CheckCircle } from 'lucide-react';
+
+type Props = {
+  onClose: () => void;
+};
+
+export function AdminDashboard({ onClose }: Props) {
+  const [activeTab, setActiveTab] = useState<'users' | 'broadcast'>('users');
+  
+  // Состояния для пользователей
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Состояния для рассылки
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgBody, setMsgBody] = useState('');
+  const [targetType, setTargetType] = useState('all');
+  const [targetUserId, setTargetUserId] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'users') fetchUsers();
+  }, [activeTab]);
+
+  async function fetchUsers() {
+    setLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100); // Ограничим 100, чтобы не грузить базу, позже можно добавить пагинацию
+    if (data) setAllUsers(data);
+    setLoading(false);
+  }
+
+  async function updateUserRole(userId: string, newRole: string) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', userId);
+    
+    if (!error) {
+      // Обновляем локально
+      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } else {
+      alert('Ошибка обновления роли');
+    }
+  }
+
+  async function sendBroadcast() {
+    if (!msgTitle || !msgBody) return;
+    if (targetType === 'specific' && !targetUserId) return;
+
+    setSending(true);
+    try {
+      const { error } = await supabase.rpc('admin_send_broadcast', {
+        target_type: targetType,
+        target_id: targetType === 'specific' ? targetUserId : null,
+        msg_title: msgTitle,
+        msg_body: msgBody,
+        msg_type: 'info' // Можно добавить выбор типа (success, warning)
+      });
+
+      if (error) throw error;
+      
+      alert('Рассылка успешно отправлена!');
+      setMsgTitle('');
+      setMsgBody('');
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка отправки');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Фильтрация юзеров
+  const filteredUsers = allUsers.filter(u => 
+    u.username?.toLowerCase().includes(search.toLowerCase()) || 
+    u.id?.includes(search)
+  );
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-slate-900 z-[100] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      {/* ШАПКА */}
+      <div className="p-6 border-b border-cyan-500/20 flex justify-between items-center bg-slate-800 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/30">
+            <Shield className="w-6 h-6 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">Админ-центр</h2>
+            <p className="text-slate-400 text-xs uppercase tracking-widest">Управление платформой</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        
+        {/* САЙДБАР (Меню) */}
+        <div className="w-64 bg-slate-800/50 border-r border-slate-700 p-4 flex flex-col gap-2">
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${activeTab === 'users' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+          >
+            <Users className="w-5 h-5" /> Пользователи
+          </button>
+          <button 
+            onClick={() => setActiveTab('broadcast')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${activeTab === 'broadcast' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+          >
+            <Megaphone className="w-5 h-5" /> Рассылка
+          </button>
+        </div>
+
+        {/* КОНТЕНТ */}
+        <div className="flex-1 bg-slate-900 p-8 overflow-y-auto">
+          
+          {/* === Вкладка ПОЛЬЗОВАТЕЛИ === */}
+          {activeTab === 'users' && (
+            <div className="max-w-5xl mx-auto">
+              <div className="flex gap-4 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input 
+                    type="text" 
+                    placeholder="Поиск по имени или ID..." 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:border-cyan-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-800 text-slate-400 uppercase text-xs">
+                    <tr>
+                      <th className="p-4">Пользователь</th>
+                      <th className="p-4">Роль</th>
+                      <th className="p-4 text-right">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-800/50 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold text-white">{u.username}</div>
+                          <div className="text-xs text-slate-500 font-mono">{u.id}</div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                            u.role === 'admin' ? 'bg-red-500/20 text-red-400' :
+                            u.role === 'teacher' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            {u.role || 'student'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <select 
+                            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-cyan-500"
+                            value={u.role || 'student'}
+                            onChange={(e) => updateUserRole(u.id, e.target.value)}
+                          >
+                            <option value="student">Ученик</option>
+                            <option value="teacher">Учитель</option>
+                            <option value="admin">Админ</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredUsers.length === 0 && (
+                  <div className="p-8 text-center text-slate-500">Никого не найдено</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* === Вкладка РАССЫЛКА === */}
+          {activeTab === 'broadcast' && (
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Megaphone className="w-6 h-6 text-cyan-400" /> Отправить уведомление
+                </h3>
+
+                <div className="space-y-6">
+                  
+                  {/* Выбор получателя */}
+                  <div>
+                    <label className="block text-slate-400 text-sm font-bold mb-2">Получатели</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {['all', 'teachers', 'students', 'specific'].map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setTargetType(type)}
+                          className={`py-2 px-3 rounded-lg text-sm font-bold border transition-all ${
+                            targetType === type 
+                              ? 'bg-cyan-600 border-cyan-500 text-white' 
+                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          {type === 'all' ? 'Все' : type === 'teachers' ? 'Учителя' : type === 'students' ? 'Ученики' : 'По ID'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Если выбрано "По ID" */}
+                  {targetType === 'specific' && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="block text-slate-400 text-sm font-bold mb-2">ID Пользователя</label>
+                      <input 
+                        type="text" 
+                        value={targetUserId}
+                        onChange={(e) => setTargetUserId(e.target.value)}
+                        placeholder="Вставьте UUID..."
+                        className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-slate-400 text-sm font-bold mb-2">Заголовок</label>
+                    <input 
+                      type="text" 
+                      value={msgTitle}
+                      onChange={(e) => setMsgTitle(e.target.value)}
+                      placeholder="Важные новости..."
+                      className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-sm font-bold mb-2">Сообщение</label>
+                    <textarea 
+                      value={msgBody}
+                      onChange={(e) => setMsgBody(e.target.value)}
+                      placeholder="Текст сообщения..."
+                      className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white h-32 resize-none"
+                    />
+                  </div>
+
+                  <button 
+                    onClick={sendBroadcast}
+                    disabled={sending || !msgTitle || !msgBody}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                  >
+                    {sending ? 'Отправка...' : <><Send className="w-5 h-5" /> ОТПРАВИТЬ</>}
+                  </button>
+
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -58,11 +58,10 @@ export const ADMIN_RANK: Rank = {
 
 // 3. ФУНКЦИЯ ПОЛУЧЕНИЯ РАНГА
 // Теперь принимает второй аргумент: isAdmin
-export function getRank(level: number, isAdmin: boolean = false): Rank {
-  if (isAdmin) {
-    return ADMIN_RANK; // Если админ - сразу возвращаем Архитектора
+export function getRank(level: number, role: string = 'student'): Rank {
+  if (role === 'admin') {
+    return ADMIN_RANK;
   }
-  // Иначе ищем по уровню
   return [...RANKS].reverse().find(r => level >= r.minLevel) || RANKS[0];
 }
 

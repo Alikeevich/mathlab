@@ -130,7 +130,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
           ) : (
             leaders.map((player) => {
               const style = getRankStyle(player.rank);
-              const rankInfo = getRank(player.clearance_level, false);
+              const rankInfo = getRank(player.clearance_level, player.role);
               const isMe = player.user_id === user?.id;
               
               return (

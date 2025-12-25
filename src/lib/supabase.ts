@@ -8,9 +8,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type Profile = {
   id: string;
   username: string;
+  role: 'student' | 'teacher' | 'admin'; // Главное поле теперь это
+  
+  // Игровые данные
   clearance_level: number;
   total_experiments: number;
   success_rate: number;
+  mmr: number;
+  
+  // Экономика
+  coins: number;
+  is_premium: boolean;
+  
+  // Компаньон (Сурикат)
+  companion_name: string | null;
+  companion_mood: number;
+  companion_level: number;
+  companion_xp: number;
+  companion_hunger: number;
+  last_fed_at: string | null;
+  
+  // Гардероб
+  equipped_hat: string | null;
+  equipped_body: string | null;
+  
   created_at: string;
   updated_at: string;
 };
@@ -54,6 +75,7 @@ export type Experiment = {
   id: string;
   user_id: string;
   module_id: string;
+  problem_id: string; // Добавили связь с задачей
   problem_type: string;
   correct: boolean;
   time_spent: number;
