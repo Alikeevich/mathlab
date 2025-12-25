@@ -230,7 +230,7 @@ function MainApp() {
           <LevelUpManager />
 
           {/* ПАНЕЛЬ УПРАВЛЕНИЯ (Для Учителей и Админов) */}
-          {(profile?.is_admin || profile?.role === 'teacher') && (
+          {(profile?.role || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
               
               {/* 1. Кнопка ТУРНИРОВ */}
@@ -252,7 +252,7 @@ function MainApp() {
               </button>
 
               {/* 3. Кнопка СУПЕР-АДМИНА (Только Админ) */}
-              {profile?.is_admin && (
+              {profile?.role && (
                 <button 
                   onClick={() => setShowAdminDashboard(true)} 
                   className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white transition-all"
