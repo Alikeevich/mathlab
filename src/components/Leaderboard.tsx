@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Trophy, Zap, TrendingUp, X, Crown, Medal, Star } from 'lucide-react';
+import { Trophy, Zap, Target, X, Crown, Medal, Star, Swords } from 'lucide-react';
 import { getRank } from '../lib/gameLogic';
 
 export function Leaderboard({ onClose }: { onClose: () => void }) {
@@ -9,7 +9,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     async function loadLeaders() {
-      // Используем нашу SQL-функцию для умной сортировки
+      // Используем нашу SQL-функцию
       const { data, error } = await supabase.rpc('get_leaderboard');
       
       if (error) console.error('Ошибка рейтинга:', error);
@@ -20,7 +20,6 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
     loadLeaders();
   }, []);
 
-  // Функция для стилей топ-3
   const getRankStyle = (index: number) => {
     switch (index) {
       case 0: return {
@@ -57,14 +56,11 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-in fade-in zoom-in duration-300">
       
-      {/* КАРТОЧКА */}
       <div className="w-full max-w-2xl bg-slate-900/90 border border-amber-500/20 rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
         
-        {/* ФОНОВЫЕ ЭФФЕКТЫ */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
 
-        {/* ШАПКА */}
         <div className="p-8 pb-4 flex justify-between items-center relative z-10">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl shadow-lg shadow-amber-500/10">
@@ -76,15 +72,11 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           
-          <button 
-            onClick={onClose} 
-            className="p-2 bg-slate-800/50 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors border border-white/5"
-          >
+          <button onClick={onClose} className="p-2 bg-slate-800/50 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors border border-white/5">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* СПИСОК (СКРОЛЛ) */}
         <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-3 custom-scrollbar relative z-10">
           
           {loading ? (
@@ -105,12 +97,12 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                   hover:scale-[1.01] hover:bg-slate-800
                 `}
               >
-                {/* 1. МЕСТО */}
+                {/* МЕСТО */}
                 <div className="w-12 h-12 flex items-center justify-center shrink-0">
                   {style.icon}
                 </div>
 
-                {/* 2. ИНФО */}
+                {/* ИНФО */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`font-bold text-lg truncate ${index < 3 ? 'text-white' : 'text-slate-300'}`}>
@@ -127,7 +119,7 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
 
-                {/* 3. СТАТИСТИКА (ПРАВАЯ ЧАСТЬ) */}
+                {/* СТАТИСТИКА */}
                 <div className="flex flex-col items-end gap-1.5">
                   
                   {/* ГЛАВНЫЙ СЧЕТ (RATING) */}
@@ -138,18 +130,24 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
 
-                  {/* ДЕТАЛИ: MP / EXP / % */}
+                  {/* ПОКАЗАТЕЛИ (ТЕПЕРЬ 3 ШТУКИ) */}
                   <div className="flex items-center gap-2">
                     
-                    {/* MP */}
+                    {/* MP (PvP) */}
                     <div className="flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded text-red-400 border border-red-500/20" title="PvP Рейтинг">
-                      <Zap className="w-3 h-3 fill-current" />
+                      <Swords className="w-3 h-3" />
                       <span className="text-xs font-mono font-bold">{player.mmr}</span>
                     </div>
+
+                    {/* EXP (Опыт) - ВОТ ОН */}
+                    <div className="flex items-center gap-1 bg-cyan-500/10 px-1.5 py-0.5 rounded text-cyan-400 border border-cyan-500/20" title="Всего задач">
+                      <Zap className="w-3 h-3 fill-current" />
+                      <span className="text-xs font-mono font-bold">{player.total_experiments}</span>
+                    </div>
                     
-                    {/* Точность */}
+                    {/* ACC (Точность) */}
                     <div className="flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-400 border border-emerald-500/20" title="Точность">
-                      <TrendingUp className="w-3 h-3" />
+                      <Target className="w-3 h-3" />
                       <span className="text-xs font-mono font-bold">{Number(player.success_rate).toFixed(0)}%</span>
                     </div>
 
@@ -160,10 +158,9 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
           })}
         </div>
         
-        {/* ФУТЕР С ЛЕГЕНДОЙ */}
         <div className="p-4 bg-slate-950/50 border-t border-slate-800 text-center">
           <p className="text-[10px] text-slate-500 font-mono">
-            RATING = MP + (EXP × 5) + (ACCURACY × 2)
+            SCORE = MP + (EXP × 5) + (ACC% × 2)
           </p>
         </div>
 
