@@ -8,7 +8,7 @@ import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
 // ИКОНКИ
-import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
+import { Settings, Zap, Crown, Keyboard, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -27,7 +27,7 @@ import { ReconnectModal } from './components/ReconnectModal';
 import { LegalModal } from './components/LegalModal';
 import PixelBlast from './components/PixelBlast';
 
-// Импорт Header
+// Импорт Header (Единственное место, где живет шапка)
 import { Header } from './components/Header';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
@@ -38,9 +38,11 @@ function MainApp() {
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   
-  // Состояния
+  // Состояния доступа
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Состояния модальных окон
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -50,21 +52,34 @@ function MainApp() {
   const [showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
+  
+  // Состояния восстановления
   const [showReconnect, setShowReconnect] = useState(false);
-  const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
-
   const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
+
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
   // === ФУНКЦИЯ ВХОДА В ТУРНИР ===
   async function joinTournament(code: string) {
     if (!user) return;
-    const { data: tour } = await supabase.from('tournaments').select('id, status').eq('code', code).single();
+    
+    const { data: tour } = await supabase
+      .from('tournaments')
+      .select('id, status')
+      .eq('code', code)
+      .single();
+
     if (tour) {
-      await supabase.from('tournament_participants').upsert({ tournament_id: tour.id, user_id: user.id });
+      await supabase.from('tournament_participants').upsert({
+        tournament_id: tour.id,
+        user_id: user.id
+      });
+      
       setShowJoinCode(false);
       window.history.replaceState({}, document.title, "/");
+      
       setActiveTournamentId(tour.id);
       setView('tournament_lobby');
     } else {
@@ -72,44 +87,109 @@ function MainApp() {
     }
   }
 
-  // === РУЧНОЙ ПЕРЕЗАХОД ===
+  // === РУЧНОЙ ПЕРЕЗАХОД (КНОПКА) ===
   async function manualReconnect() {
     if (!user) return;
     setIsReconnecting(true);
+
     try {
-      const { data: tourPart } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (tourPart && tourPart.tournaments) { setActiveTournamentId(tourPart.tournament_id); setView('tournament_lobby'); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) { setView('pvp'); return; }
+      // 1. Проверяем ТУРНИР
+      const { data: tourPart } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .neq('tournaments.status', 'finished')
+        .maybeSingle();
+
+      if (tourPart && tourPart.tournaments) {
+        setActiveTournamentId(tourPart.tournament_id);
+        setView('tournament_lobby');
+        return;
+      }
+
+      // 2. Проверяем PVP
+      const { data: duel } = await supabase
+        .from('duels')
+        .select('id')
+        .eq('status', 'active')
+        .is('tournament_id', null)
+        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (duel) {
+        setView('pvp');
+        return;
+      }
+
       alert("Активных игр не найдено.");
-    } catch (e) { console.error(e); } finally { setIsReconnecting(false); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsReconnecting(false);
+    }
   }
 
-  // === ПРОВЕРКИ ===
+  // === ПРОВЕРКИ ПРИ ЗАГРУЗКЕ ===
+
+  // 1. Проверка URL (код турнира)
   useEffect(() => {
     if (!user) return;
-    const tCode = new URLSearchParams(window.location.search).get('t');
-    if (tCode) joinTournament(tCode);
+    const params = new URLSearchParams(window.location.search);
+    const tCode = params.get('t');
+    if (tCode) {
+      joinTournament(tCode);
+    }
   }, [user]);
 
+  // 2. АВТО-РЕКОННЕКТ
   useEffect(() => {
     async function checkActiveSession() {
       if (!user) return;
-      const { data: part } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (part && part.tournaments) { setReconnectData({ type: 'tournament', id: part.tournament_id }); setShowReconnect(true); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) setView('pvp');
+
+      // А. Проверяем участие в ТУРНИРЕ
+      const { data: part } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .neq('tournaments.status', 'finished') 
+        .maybeSingle();
+
+      if (part && part.tournaments) {
+        setReconnectData({ type: 'tournament', id: part.tournament_id });
+        setShowReconnect(true); 
+        return;
+      }
+
+      // Б. Проверяем обычное PVP
+      const { data: duel } = await supabase
+        .from('duels')
+        .select('id')
+        .eq('status', 'active')
+        .is('tournament_id', null) 
+        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (duel) {
+        setView('pvp');
+      }
     }
+    
     checkActiveSession();
   }, [user]);
 
   const handleReconnectConfirm = () => {
-    if (reconnectData?.type === 'tournament' && reconnectData.id) { setActiveTournamentId(reconnectData.id); setView('tournament_lobby'); }
+    if (reconnectData?.type === 'tournament' && reconnectData.id) {
+      setActiveTournamentId(reconnectData.id);
+      setView('tournament_lobby');
+    }
     setShowReconnect(false);
   };
-  const handleReconnectCancel = async () => { setShowReconnect(false); };
+  
+  const handleReconnectCancel = async () => {
+     setShowReconnect(false);
+  };
 
-  // АВТО-ОТКРЫТИЕ АДМИНКИ (ЕСЛИ УЧИТЕЛЬ)
+  // 3. Авто-админка
   useEffect(() => {
     async function checkHosting() {
       if (!user) return;
@@ -122,6 +202,7 @@ function MainApp() {
     checkHosting();
   }, [user, profile]);
 
+  // 4. Онбординг
   useEffect(() => {
     if (!profile) return;
     if (profile.total_experiments === 0 && profile.clearance_level === 0) {
@@ -131,39 +212,98 @@ function MainApp() {
     if (!profile.companion_name) setShowCompanionSetup(true);
   }, [profile, showOnboarding]);
 
-  function finishOnboarding() { localStorage.setItem('onboarding_seen', 'true'); setShowOnboarding(false); }
-
-  function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
-  function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
-  function handleBackToMap() {
-    if (activeTournamentId && view === 'pvp') setView('tournament_lobby');
-    else { setView('map'); setSelectedSector(null); setActiveTournamentId(null); }
+  function finishOnboarding() {
+    localStorage.setItem('onboarding_seen', 'true');
+    setShowOnboarding(false);
   }
-  function handleBackToModules() { setView('modules'); setSelectedModule(null); }
 
-  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">Загрузка...</div>;
+  // Навигация
+  function handleSectorSelect(sector: Sector) {
+    setSelectedSector(sector);
+    setView('modules');
+  }
+  function handleStartExperiment(module: Module) {
+    setSelectedModule(module);
+    setView('reactor');
+  }
+  function handleBackToMap() {
+    if (activeTournamentId && view === 'pvp') {
+       setView('tournament_lobby');
+    } else {
+       setView('map');
+       setSelectedSector(null);
+       setActiveTournamentId(null); 
+    }
+  }
+  function handleBackToModules() {
+    setView('modules');
+    setSelectedModule(null);
+  }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">
+        Загрузка...
+      </div>
+    );
+  }
+
+  // === 1. ЛЕНДИНГ ===
   if (!user && !isGuest && !showAuthModal) {
     return (
       <>
-        <LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} onOpenLegal={(type) => setShowLegal(type)} />
+        <LandingPage 
+          onStartDemo={() => setIsGuest(true)} 
+          onLogin={() => setShowAuthModal(true)} 
+          onOpenLegal={(type) => setShowLegal(type)}
+        />
         {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
       </>
     );
   }
 
-  if (!user && showAuthModal) return <div className="relative"><button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button><Auth onOpenLegal={(type) => setShowLegal(type)} />{showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}</div>;
+  // === 2. ВХОД ===
+  if (!user && showAuthModal) {
+    return (
+      <div className="relative">
+         <button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button>
+         <Auth onOpenLegal={(type) => setShowLegal(type)} />
+         {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
 
+  // === 3. ПРИЛОЖЕНИЕ ===
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
+      
+      {/* ФОН */}
       <div className="absolute inset-0 z-0">
-        <PixelBlast variant="circle" pixelSize={6} color="#B19EEF" patternScale={3} patternDensity={1.2} pixelSizeJitter={0.5} enableRipples rippleSpeed={0.4} rippleThickness={0.12} rippleIntensityScale={1.5} liquid liquidStrength={0.12} liquidRadius={1.2} liquidWobbleSpeed={5} speed={0.6} edgeFade={0.25} transparent />
+        <PixelBlast
+          variant="circle"
+          pixelSize={6}
+          color="#B19EEF"
+          patternScale={3}
+          patternDensity={1.2}
+          pixelSizeJitter={0.5}
+          enableRipples
+          rippleSpeed={0.4}
+          rippleThickness={0.12}
+          rippleIntensityScale={1.5}
+          liquid
+          liquidStrength={0.12}
+          liquidRadius={1.2}
+          liquidWobbleSpeed={5}
+          speed={0.6}
+          edgeFade={0.25}
+          transparent
+        />
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
       </div>
 
       <div className="relative z-10 h-full flex flex-col">
         
-        {/* ХЕДЕР */}
+        {/* === HEADER (ВЫНЕСЕННЫЙ КОМПОНЕНТ) === */}
         <Header 
           user={user} 
           profile={profile} 
@@ -180,17 +320,37 @@ function MainApp() {
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
+              
+              {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
+                
                 {user ? (
                    <>
-                    <button onClick={manualReconnect} disabled={isReconnecting} className="p-3 md:p-4 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50" title="Перезаход">
+                    {/* КНОПКА ПЕРЕЗАХОДА */}
+                    <button 
+                      onClick={manualReconnect}
+                      disabled={isReconnecting}
+                      className="p-3 md:p-4 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
+                      title="Проверить активные игры (Перезаход)"
+                    >
                       <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
                     </button>
-                    <button onClick={() => setShowJoinCode(true)} className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all">
-                      <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" /><span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
+
+                    <button 
+                      onClick={() => setShowJoinCode(true)}
+                      className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                    >
+                      <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                      <span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
                     </button>
-                    <button onClick={() => setView('pvp')} className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden">
-                      <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" /><Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" /><span className="font-black text-white text-lg tracking-widest italic">PVP ARENA</span>
+
+                    <button 
+                      onClick={() => setView('pvp')}
+                      className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
+                      <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
+                      <span className="font-black text-white text-lg tracking-widest italic">PVP ARENA</span>
                     </button>
                    </>
                 ) : (
@@ -202,14 +362,33 @@ function MainApp() {
             </>
           )}
           
-          {view === 'modules' && selectedSector && <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />}
-          {view === 'reactor' && selectedModule && <Reactor module={selectedModule} onBack={handleBackToModules} onRequestAuth={() => setShowAuthModal(true)} />}
-          {user && view === 'pvp' && <PvPMode onBack={handleBackToMap} />}
-          {user && view === 'tournament_lobby' && activeTournamentId && <TournamentLobby tournamentId={activeTournamentId} onBattleStart={() => setView('pvp')} />}
+          {view === 'modules' && selectedSector && (
+            <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />
+          )}
+
+          {view === 'reactor' && selectedModule && (
+            <Reactor 
+               module={selectedModule} 
+               onBack={handleBackToModules} 
+               onRequestAuth={() => setShowAuthModal(true)} 
+            />
+          )}
+
+          {/* PvP и Турниры только для User */}
+          {user && view === 'pvp' && (
+            <PvPMode onBack={handleBackToMap} />
+          )}
+          
+          {user && view === 'tournament_lobby' && activeTournamentId && (
+            <TournamentLobby 
+              tournamentId={activeTournamentId} 
+              onBattleStart={() => setView('pvp')} 
+            />
+          )}
         </main>
       </div>
 
-      {/* МОДАЛКИ */}
+      {/* МОДАЛКИ (ТОЛЬКО ДЛЯ USER) */}
       {user && (
         <>
           {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
@@ -221,7 +400,14 @@ function MainApp() {
           {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
-          {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
+          
+          {showReconnect && (
+            <ReconnectModal 
+              onReconnect={handleReconnectConfirm} 
+              onCancel={handleReconnectCancel} 
+            />
+          )}
+          
           <LevelUpManager />
 
           {/* КНОПКИ АДМИНА / УЧИТЕЛЯ (Показываем и тем, и другим) */}
