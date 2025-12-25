@@ -21,3 +21,15 @@ math-field:focus-within {
 math-field::part(content) {
   padding: 8px 0; /* Чуть отступа */
 }
+
+body .ML__keyboard {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+}
+
+/* Скрываем панель подсказок, если она вылезает */
+.ML__suggestion-popover {
+  display: none !important;
+}
