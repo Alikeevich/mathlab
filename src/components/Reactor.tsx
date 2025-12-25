@@ -55,7 +55,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // === 1. ЗАГРУЗКА ===
+  // === 1. ЗАГРУЗКА ЗАДАЧ ===
   useEffect(() => {
     async function fetchProblems() {
       setLoading(true);
@@ -88,20 +88,25 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setShowHint(false);
     setStartTime(Date.now());
     
-    // Очистка (Без фокуса!)
+    // Очистка
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
+      // Здесь фокус нужен, так как это начало новой задачи
+      // preventScroll: true ОБЯЗАТЕЛЕН
+      setTimeout(() => {
+        if (mfRef.current) mfRef.current.focus({ preventScroll: true });
+      }, 50);
     }
   }
 
-  // === 3. ОБРАБОТКА НАЖАТИЙ (БЕЗ ФОКУСА) ===
+  // === 3. ОБРАБОТКА НАЖАТИЙ (ИСПРАВЛЕНО) ===
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
-    // Мы НЕ вызываем focus(). Мы просто говорим компоненту "вставь это".
-    // Так как каретка (мигалка) прозрачная, юзеру визуально всё равно, есть фокус или нет.
-    // Но ввод будет работать.
+    // УБРАЛ ВЫЗОВ .focus() ОТСЮДА! 
+    // Клавиатура сама держит фокус через preventDefault.
+    // Браузер теперь не будет пытаться скроллить к полю.
 
     if (cmd === 'insert') {
       mfRef.current.executeCommand(['insert', arg]);
@@ -119,6 +124,10 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     if (!mfRef.current) return;
     mfRef.current.setValue('');
     setUserAnswer('');
+    // При полной очистке можно мягко вернуть фокус, если он пропал
+    if (document.activeElement !== mfRef.current) {
+       mfRef.current.focus({ preventScroll: true });
+    }
   };
 
   // === 4. ОТПРАВКА ===
@@ -160,11 +169,8 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   if (showPaywall) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in zoom-in duration-300">
-        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600" />
-          <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/50">
-            <Lock className="w-10 h-10 text-amber-400" />
-          </div>
+        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl">
+          <Lock className="w-10 h-10 text-amber-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-3">Демо-режим завершен</h2>
           <p className="text-slate-400 mb-8">Создайте аккаунт для продолжения.</p>
           <button onClick={onRequestAuth} className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl">Создать аккаунт</button>
@@ -178,7 +184,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     <div className="w-full h-full overflow-y-auto pb-20 custom-scrollbar">
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         
-        {/* Хедер и статы */}
         <div className="flex justify-between items-center mb-6 md:mb-8">
            <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group px-3 py-2 rounded-lg hover:bg-slate-800">
              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -214,7 +219,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
           </div>
         </div>
 
-        {/* Тело задачи */}
         {currentProblem ? (
           <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -235,7 +239,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
               </h2>
             </div>
 
-            {/* ЗОНА ВВОДА */}
+            {/* ЗОНА РЕШЕНИЯ */}
             {result === null ? (
               <div className="relative z-10">
                 <div className="mb-4">
@@ -243,6 +247,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                     Ввод решения
                   </label>
                   
+                  {/* === ВВОД (MathInput) === */}
                   <MathInput 
                     value={userAnswer}
                     onChange={setUserAnswer}
@@ -251,6 +256,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                   />
                 </div>
 
+                {/* === КЛАВИАТУРА === */}
                 <MathKeypad 
                   onCommand={handleKeypadCommand} 
                   onDelete={handleKeypadDelete}
@@ -280,7 +286,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                 )}
               </div>
             ) : (
-              // РЕЗУЛЬТАТ
+              // ЗОНА РЕЗУЛЬТАТА
               <div className={`p-6 rounded-2xl border-2 flex items-center gap-4 animate-in zoom-in duration-300 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
                 <div className={`p-3 rounded-full shrink-0 ${result === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
                   {result === 'correct' ? (
