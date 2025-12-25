@@ -5,87 +5,67 @@ import { evaluate } from 'mathjs';
  */
 function normalizeForCalculation(str: string): string {
   if (!str) return '';
-  let s = str.toLowerCase().trim();
-  
-  // 1. Предварительная очистка символов
-  s = s.replace(/,/g, '.');
-  s = s.replace(/√/g, 'sqrt');
-  s = s.replace(/π/g, 'pi');
-  s = s.replace(/°/g, 'deg');
-  s = s.replace(/×/g, '*');
-  s = s.replace(/⋅/g, '*');
-  
-  // Infinity (разные варианты написания)
-  s = s.replace(/\\infty/g, 'Infinity');
-  s = s.replace(/∞/g, 'Infinity');
-  s = s.replace(/\binf(inity)?\b/g, 'Infinity');
+  let s = str.trim(); // НЕ делаем toLowerCase сразу, чтобы не сломать LaTeX команды типа \Delta
 
-  // Контекстная замена двоеточия (только между цифрами)
-  s = s.replace(/(\d):(\d)/g, '$1/$2');
+  // === 1. Базовая зачистка MathQuill ===
+  // Пустое множество
+  if (s.includes('\\emptyset') || s.includes('\\O') || s.toLowerCase() === 'no solution' || s.toLowerCase() === 'нет решений') return 'NaN';
 
-  // 2. Обработка LaTeX
-  // Корни n-й степени: \sqrt[3]{8} -> nthRoot(8, 3)
-  s = s.replace(/\\sqrt\[(\d+)\]\{(.+?)\}/g, 'nthRoot($2, $1)');
+  // MathQuill пишет \log_{2}{x}. Нам нужно log(x, 2)
+  // Регулярка: \log_{основание}{аргумент}
+  // Внимание: MathQuill может давать \log_{2}8 без скобок для аргумента, если это одна цифра
+  s = s.replace(/\\log_\{(.+?)\}\{(.+?)\}/g, 'log($2, $1)'); // \log_{2}{8}
+  s = s.replace(/\\log_\{(.+?)\}(.+?)/g, 'log($2, $1)');     // \log_{2}8
   
-  // Обычные корни
-  s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
-  s = s.replace(/\\sqrt/g, 'sqrt');
+  // Обычный логарифм \log{x} -> log10(x)
+  s = s.replace(/\\log\\left\((.+?)\\right\)/g, 'log10($1)');
+  s = s.replace(/\\log\{(.+?)\}/g, 'log10($1)');
 
-  // Дроби
+  // Дроби \frac{a}{b} -> (a)/(b)
   s = s.replace(/\\frac\{(.+?)\}\{(.+?)\}/g, '(($1)/($2))');
 
-  // Убираем слеши перед функциями
-  const funcs = ['sin', 'cos', 'tan', 'cot', 'ln', 'lg', 'log'];
-  funcs.forEach(f => {
-    s = s.replace(new RegExp(`\\\\${f}`, 'g'), f);
-  });
-  
-  // lg -> log10 (школьный стандарт)
-  s = s.replace(/lg/g, 'log10'); 
+  // Корни
+  s = s.replace(/\\sqrt\[(.+?)\]\{(.+?)\}/g, 'nthRoot($2, $1)'); // корень n степени
+  s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
 
-  // Пи, умножение
-  s = s.replace(/\\pi/g, 'pi');
+  // Тригонометрия (убираем слеши)
+  // \sin\left(30\right) -> sin(30)
+  s = s.replace(/\\(sin|cos|tan|cot|sec|csc)/g, '$1');
+  
+  // Убираем \left( и \right)
+  s = s.replace(/\\left\(/g, '(').replace(/\\right\)/g, ')');
+  s = s.replace(/\\left\|/g, 'abs(').replace(/\\right\|/g, ')');
+  
+  // Градусы: ^\circ -> deg
+  s = s.replace(/\^\{\\circ\}/g, 'deg');
+  s = s.replace(/\\circ/g, 'deg');
+  s = s.replace(/°/g, 'deg');
+
+  // Умножение
   s = s.replace(/\\cdot/g, '*');
+  s = s.replace(/\\times/g, '*');
+  s = s.replace(/×/g, '*');
+  s = s.replace(/⋅/g, '*');
 
-  // Убираем LaTeX скобки { } -> ( )
-  s = s.replace(/\{/g, '(').replace(/\}/g, ')');
-  s = s.replace(/\\/g, ''); // Остатки слешей
+  // Бесконечность
+  s = s.replace(/\\infty/g, 'Infinity');
+  s = s.replace(/∞/g, 'Infinity');
 
-  // 3. УМНАЯ РАССТАНОВКА СКОБОК ДЛЯ ФУНКЦИЙ
+  // Пи
+  s = s.replace(/\\pi/g, 'pi');
+  s = s.replace(/π/g, 'pi');
+
+  // Очистка от остальных LaTeX символов
+  s = s.replace(/[{}]/g, ''); // Убираем фигурные скобки, которые остались
   
-  // log без пробела (log2 -> log10(2))
-  // Ищем log, за которым идет цифра или переменная, но не скобка
-  s = s.replace(/log(?!\()(\d+(\.\d+)?|pi|infinity|[a-z])/g, 'log10($1)');
+  // Теперь можно в lowerCase
+  s = s.toLowerCase();
 
-  // Тригонометрия и функции без скобок (sin30 -> sin(30), sinx -> sin(x))
-  // Поддерживаем: sin 30, sin30, sin x, sinx
-  const trigFuncs = 'sin|cos|tan|cot|ln|log10|sqrt';
+  // Неявное умножение и пробелы
+  s = s.replace(/\s+/g, '');
   
-  // Сначала обрабатываем с градусами (sin30deg -> sin(30deg))
-  // Нужно вставить пробел перед deg, если его нет, чтобы mathjs понял unit
-  s = s.replace(/(\d)deg/g, '$1 deg');
-
-  // Теперь оборачиваем аргумент в скобки
-  // 1. Если аргумент - число/pi/inf/переменная (одна буква)
-  // Исключаем случай, если уже есть скобка
-  const regexArg = new RegExp(`(${trigFuncs})\\s*(?!\\()(\\d+(\\.\\d+)?( deg)?|pi|infinity|[a-z])`, 'g');
-  s = s.replace(regexArg, '$1($2)');
-
-  // 4. НЕЯВНОЕ УМНОЖЕНИЕ (Implicit Multiplication)
-  
-  s = s.replace(/\s+/g, ''); // Убираем все пробелы (mathjs не нужны пробелы внутри формул)
-
-  // Число/Скобка перед Буквой/Функцией/Скобкой
-  // 2x -> 2*x, )x -> )*x, 2sin -> 2*sin
-  s = s.replace(/(\d|\))(?=[a-z\(]|sqrt|sin|cos|tan|ln|log)/g, '$1*');
-  
-  // Между буквами (xy -> x*y), но не внутри имен функций!
-  // Это сложно регуляркой, поэтому mathjs сам часто справляется с xy.
-  // Но для надежности можно добавить, если это точно переменные.
-  // Пока оставим на откуп mathjs, он умный.
-
-  // Если sqrt3 (без скобок) -> sqrt(3) - страховка
-  s = s.replace(/sqrt(\d+(\.\d+)?)/g, 'sqrt($1)');
+  // 2x -> 2*x
+  s = s.replace(/(\d)(?=[a-z(])/g, '$1*');
 
   return s;
 }
@@ -102,6 +82,7 @@ function expandOptions(str: string): string[] {
     if (!part) continue;
 
     part = part.replace(/\+-/g, '±');
+    part = part.replace(/\\pm/g, '±'); // LaTeX plus-minus
 
     if (part.includes('±')) {
       const idx = part.indexOf('±');
@@ -140,9 +121,11 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
     const calculate = (expr: string): number => {
       try {
         const norm = normalizeForCalculation(expr);
+        if (norm === 'NaN') return NaN;
+        
         const res = evaluate(norm);
-        if (typeof res === 'number' && !isNaN(res)) {
-          return res; // Разрешаем Infinity для сравнения
+        if (typeof res === 'number') {
+          return res; 
         }
         return NaN;
       } catch (e) {
@@ -178,13 +161,13 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
          return Math.abs(Math.round(uVal) - Math.round(dVal)) === 0;
       }
       
-      // Относительная погрешность (Уменьшил для больших чисел)
+      // Относительная погрешность
       const tolerance = Math.max(0.05, Math.abs(dVal * 1e-6));
       return diff <= tolerance;
     });
 
   } catch (e) {
-    // Fallback
+    // Fallback: строковое сравнение нормализованных значений
     const clean = (s: string) => normalizeForCalculation(s);
     const userSorted = expandOptions(userAnswer).map(clean).sort().join(';');
     const dbSorted = expandOptions(dbAnswer).map(clean).sort().join(';');

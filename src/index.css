@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+math-field::part(virtual-keyboard-toggle) {
+  display: none !important;
+}
+
+/* Скрываем кнопку меню (гамбургер) */
+math-field::part(menu-toggle) {
+  display: none !important;
+}
+
+/* Убираем синюю рамку при фокусе, так как у нас есть своя рамка контейнера */
+math-field:focus-within {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Убираем фон выделения, чтобы он был прозрачным или под наш стиль */
+math-field::part(content) {
+  padding: 8px 0; /* Чуть отступа */
+}
