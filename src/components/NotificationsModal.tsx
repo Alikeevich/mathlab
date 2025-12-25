@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Bell, Check, Trash2, Mail, MailOpen } from 'lucide-react';
+import { X, Bell, Trash2, MailOpen, AlertCircle } from 'lucide-react';
 
 type Notification = {
   id: string;
@@ -23,7 +23,7 @@ export function NotificationsModal({ onClose }: Props) {
 
   useEffect(() => {
     loadNotifications();
-    markAllAsRead(); // Открыл окно -> считаем, что увидел
+    markAllAsRead(); 
   }, []);
 
   async function loadNotifications() {
@@ -48,8 +48,19 @@ export function NotificationsModal({ onClose }: Props) {
   }
 
   async function deleteNotification(id: string) {
+    // 1. Оптимистичное обновление (удаляем визуально сразу)
+    const previousNotifications = [...notifications];
     setNotifications(prev => prev.filter(n => n.id !== id));
-    await supabase.from('notifications').delete().eq('id', id);
+
+    // 2. Удаляем из базы
+    const { error } = await supabase.from('notifications').delete().eq('id', id);
+
+    // 3. Если ошибка — возвращаем обратно и ругаемся в консоль
+    if (error) {
+      console.error('Ошибка удаления:', error.message);
+      setNotifications(previousNotifications);
+      alert('Не удалось удалить сообщение. Проверьте права доступа (RLS).');
+    }
   }
 
   const getTypeStyles = (type: string) => {
@@ -90,21 +101,22 @@ export function NotificationsModal({ onClose }: Props) {
             notifications.map((n) => (
               <div 
                 key={n.id} 
-                className={`relative p-4 rounded-xl border ${getTypeStyles(n.type)} transition-all hover:bg-slate-800`}
+                className={`relative p-4 rounded-xl border ${getTypeStyles(n.type)} transition-all hover:bg-slate-800 group`}
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-lg">{n.title}</h3>
                   <button 
                     onClick={() => deleteNotification(n.id)}
-                    className="text-slate-500 hover:text-red-400 transition-colors"
-                    title="Удалить"
+                    className="p-1.5 rounded-lg text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                    title="Удалить навсегда"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-sm opacity-90 leading-relaxed whitespace-pre-wrap">{n.message}</p>
-                <div className="mt-3 text-[10px] opacity-50 font-mono text-right">
-                  {new Date(n.created_at).toLocaleString()}
+                <div className="mt-3 text-[10px] opacity-50 font-mono text-right flex justify-between items-center">
+                   {n.is_read && <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Прочитано</span>}
+                   <span>{new Date(n.created_at).toLocaleString()}</span>
                 </div>
               </div>
             ))
