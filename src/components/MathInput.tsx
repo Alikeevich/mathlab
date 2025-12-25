@@ -7,7 +7,7 @@ declare global {
       'math-field': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         ref?: any;
         'virtual-keyboard-mode'?: string;
-        inputmode?: string; // Добавили типизацию
+        inputmode?: string;
       };
     }
   }
@@ -29,9 +29,9 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
 
     // === НАСТРОЙКИ ===
     mf.smartMode = true; 
-    mf.virtualKeyboardMode = 'manual'; // Отключаем встроенную клавиатуру MathLive
+    mf.virtualKeyboardMode = 'manual'; 
     mf.menuItems = []; 
-    mf.keypressSound = null; // Без звука
+    mf.keypressSound = null;
 
     const handleInput = (e: any) => {
       onChange(e.target.value);
@@ -44,8 +44,16 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
       }
     };
 
+    // === НОВЫЙ ХАК ОТ ПРЫЖКОВ ===
+    // Перехватываем событие фокуса самого элемента
+    const handleFocus = (e: FocusEvent) => {
+      // Это предотвращает некоторые браузерные сдвиги
+      // Но главное - мы контролируем это в Reactor через preventScroll
+    };
+
     mf.addEventListener('input', handleInput);
     mf.addEventListener('keydown', handleKeydown);
+    mf.addEventListener('focus', handleFocus); // Добавили слушатель
 
     if (mfRef) mfRef.current = mf;
 
@@ -56,6 +64,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     return () => {
       mf.removeEventListener('input', handleInput);
       mf.removeEventListener('keydown', handleKeydown);
+      mf.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -70,7 +79,6 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     <div className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden">
       <math-field
         ref={internalRef}
-        // ВАЖНО: Запрещаем системную клавиатуру (iOS/Android), но разрешаем ввод
         inputmode="none" 
         virtual-keyboard-mode="manual"
         style={{
@@ -80,6 +88,8 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
           color: 'white',
           border: 'none',
           outline: 'none',
+          // ВАЖНО: touch-action: none запрещает браузеру думать о скролле внутри поля
+          touchAction: 'none', 
           '--caret-color': '#22d3ee', 
           '--selection-background-color': 'rgba(34, 211, 238, 0.3)',
           '--contains-highlight-backgound-color': 'transparent',
