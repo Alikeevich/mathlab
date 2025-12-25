@@ -1,69 +1,176 @@
-// В src/lib/mathUtils.ts
+import { evaluate } from 'mathjs';
 
+/**
+ * Превращает математическую строку (LaTeX или человеческую) в формат, понятный mathjs
+ */
 function normalizeForCalculation(str: string): string {
   if (!str) return '';
-  let s = str.toLowerCase().trim();
+  let s = str.trim(); // НЕ делаем toLowerCase сразу, чтобы не сломать LaTeX команды типа \Delta
+
+  // === 1. Базовая зачистка MathQuill ===
+  // Пустое множество
+  if (s.includes('\\emptyset') || s.includes('\\O') || s.toLowerCase() === 'no solution' || s.toLowerCase() === 'нет решений') return 'NaN';
+
+  // MathQuill пишет \log_{2}{x}. Нам нужно log(x, 2)
+  // Регулярка: \log_{основание}{аргумент}
+  // Внимание: MathQuill может давать \log_{2}8 без скобок для аргумента, если это одна цифра
+  s = s.replace(/\\log_\{(.+?)\}\{(.+?)\}/g, 'log($2, $1)'); // \log_{2}{8}
+  s = s.replace(/\\log_\{(.+?)\}(.+?)/g, 'log($2, $1)');     // \log_{2}8
   
-  // === НОВОЕ: Обработка пустого множества ===
-  // Если ученик ввел "нет решений" или символ ∅
-  if (s === '∅' || s === 'no solution' || s === 'нет решений') return 'NaN'; // NaN условно будет значить отсутствие решений
+  // Обычный логарифм \log{x} -> log10(x)
+  s = s.replace(/\\log\\left\((.+?)\\right\)/g, 'log10($1)');
+  s = s.replace(/\\log\{(.+?)\}/g, 'log10($1)');
 
-  // 1. Предварительная очистка
-  s = s.replace(/,/g, '.');
-  s = s.replace(/√/g, 'sqrt');
-  s = s.replace(/π/g, 'pi');
-  s = s.replace(/°/g, 'deg');
-  s = s.replace(/×/g, '*');
-  s = s.replace(/⋅/g, '*');
-  s = s.replace(/±/g, ''); // mathjs не понимает ± внутри выражения, обработка идет в expandOptions
-  
-  // Infinity
-  s = s.replace(/\\infty/g, 'Infinity');
-  s = s.replace(/∞/g, 'Infinity');
-  s = s.replace(/\binf(inity)?\b/g, 'Infinity');
-
-  // Двоеточие как деление
-  s = s.replace(/(\d):(\d)/g, '$1/$2');
-
-  // === НОВОЕ: Обработка логарифма с основанием log_2(x) -> log(x, 2) ===
-  // Паттерн: log_число(аргумент)
-  // Мы ищем: log _ (число/буква) ( (аргумент) )
-  // Регулярка ловит: log_2(8) или log_a(b)
-  s = s.replace(/log_(\d+|[a-z])\((.+?)\)/g, 'log($2, $1)');
-  // Если написали без скобок: log_2 8
-  s = s.replace(/log_(\d+|[a-z])\s+(\d+|[a-z])/g, 'log($2, $1)');
-
-  // ... (Остальной код функции без изменений до return s)
-  
-  // 2. Обработка LaTeX...
-  s = s.replace(/\\sqrt\[(\d+)\]\{(.+?)\}/g, 'nthRoot($2, $1)');
-  s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
-  s = s.replace(/\\sqrt/g, 'sqrt');
+  // Дроби \frac{a}{b} -> (a)/(b)
   s = s.replace(/\\frac\{(.+?)\}\{(.+?)\}/g, '(($1)/($2))');
 
-  const funcs = ['sin', 'cos', 'tan', 'cot', 'ln', 'lg', 'log'];
-  funcs.forEach(f => {
-    s = s.replace(new RegExp(`\\\\${f}`, 'g'), f);
-  });
+  // Корни
+  s = s.replace(/\\sqrt\[(.+?)\]\{(.+?)\}/g, 'nthRoot($2, $1)'); // корень n степени
+  s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
+
+  // Тригонометрия (убираем слеши)
+  // \sin\left(30\right) -> sin(30)
+  s = s.replace(/\\(sin|cos|tan|cot|sec|csc)/g, '$1');
   
-  s = s.replace(/lg/g, 'log10'); 
-  s = s.replace(/\\pi/g, 'pi');
+  // Убираем \left( и \right)
+  s = s.replace(/\\left\(/g, '(').replace(/\\right\)/g, ')');
+  s = s.replace(/\\left\|/g, 'abs(').replace(/\\right\|/g, ')');
+  
+  // Градусы: ^\circ -> deg
+  s = s.replace(/\^\{\\circ\}/g, 'deg');
+  s = s.replace(/\\circ/g, 'deg');
+  s = s.replace(/°/g, 'deg');
+
+  // Умножение
   s = s.replace(/\\cdot/g, '*');
-  s = s.replace(/\{/g, '(').replace(/\}/g, ')');
-  s = s.replace(/\\/g, '');
+  s = s.replace(/\\times/g, '*');
+  s = s.replace(/×/g, '*');
+  s = s.replace(/⋅/g, '*');
 
-  // 3. Скобки для функций
-  s = s.replace(/log(?!\()(\d+(\.\d+)?|pi|infinity|[a-z])/g, 'log10($1)');
-  s = s.replace(/(\d)deg/g, '$1 deg');
+  // Бесконечность
+  s = s.replace(/\\infty/g, 'Infinity');
+  s = s.replace(/∞/g, 'Infinity');
 
-  const trigFuncs = 'sin|cos|tan|cot|ln|log10|sqrt';
-  const regexArg = new RegExp(`(${trigFuncs})\\s*(?!\\()(\\d+(\\.\\d+)?( deg)?|pi|infinity|[a-z])`, 'g');
-  s = s.replace(regexArg, '$1($2)');
+  // Пи
+  s = s.replace(/\\pi/g, 'pi');
+  s = s.replace(/π/g, 'pi');
 
-  // 4. Неявное умножение
-  s = s.replace(/\s+/g, ''); 
-  s = s.replace(/(\d|\))(?=[a-z\(]|sqrt|sin|cos|tan|ln|log)/g, '$1*');
-  s = s.replace(/sqrt(\d+(\.\d+)?)/g, 'sqrt($1)');
+  // Очистка от остальных LaTeX символов
+  s = s.replace(/[{}]/g, ''); // Убираем фигурные скобки, которые остались
+  
+  // Теперь можно в lowerCase
+  s = s.toLowerCase();
+
+  // Неявное умножение и пробелы
+  s = s.replace(/\s+/g, '');
+  
+  // 2x -> 2*x
+  s = s.replace(/(\d)(?=[a-z(])/g, '$1*');
 
   return s;
+}
+
+/**
+ * Рекурсивно разворачивает строку с вариантами (±).
+ */
+function expandOptions(str: string): string[] {
+  const parts = str.split(';');
+  let results: string[] = [];
+
+  for (let part of parts) {
+    part = part.trim();
+    if (!part) continue;
+
+    part = part.replace(/\+-/g, '±');
+    part = part.replace(/\\pm/g, '±'); // LaTeX plus-minus
+
+    if (part.includes('±')) {
+      const idx = part.indexOf('±');
+      const left = part.substring(0, idx).trim();
+      const right = part.substring(idx + 1).trim();
+
+      // Добавляем скобки только если правая часть сложная
+      const isComplex = /[+\-*/^]/.test(right);
+      const rStr = isComplex ? `(${right})` : right;
+
+      const plus = `${left}+${rStr}`;
+      const minus = `${left}-${rStr}`;
+      
+      // Рекурсия (допускаем простую вложенность)
+      if (plus.includes('±')) {
+         results = results.concat(expandOptions(plus));
+         results = results.concat(expandOptions(minus));
+      } else {
+         results.push(plus);
+         results.push(minus);
+      }
+    } else {
+      results.push(part);
+    }
+  }
+  return results;
+}
+
+export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
+  if (!userAnswer) return false;
+
+  try {
+    const userExprs = expandOptions(userAnswer);
+    const dbExprs = expandOptions(dbAnswer);
+
+    const calculate = (expr: string): number => {
+      try {
+        const norm = normalizeForCalculation(expr);
+        if (norm === 'NaN') return NaN;
+        
+        const res = evaluate(norm);
+        if (typeof res === 'number') {
+          return res; 
+        }
+        return NaN;
+      } catch (e) {
+        return NaN;
+      }
+    };
+
+    const userValues = userExprs.map(calculate);
+    const dbValues = dbExprs.map(calculate);
+
+    // Если есть NaN, идем в строковое сравнение
+    if (userValues.some(isNaN) || dbValues.some(isNaN)) {
+       throw new Error("Fallback to string");
+    }
+
+    userValues.sort((a, b) => a - b);
+    dbValues.sort((a, b) => a - b);
+
+    if (userValues.length !== dbValues.length) return false;
+
+    return userValues.every((uVal, i) => {
+      const dVal = dbValues[i];
+      
+      // Обработка Бесконечности
+      if (!isFinite(uVal) || !isFinite(dVal)) {
+        return uVal === dVal;
+      }
+
+      const diff = Math.abs(uVal - dVal);
+      
+      // Строгое сравнение для "почти целых" чисел
+      if (Math.abs(Math.round(uVal) - uVal) < 1e-9 && Math.abs(Math.round(dVal) - dVal) < 1e-9) {
+         return Math.abs(Math.round(uVal) - Math.round(dVal)) === 0;
+      }
+      
+      // Относительная погрешность
+      const tolerance = Math.max(0.05, Math.abs(dVal * 1e-6));
+      return diff <= tolerance;
+    });
+
+  } catch (e) {
+    // Fallback: строковое сравнение нормализованных значений
+    const clean = (s: string) => normalizeForCalculation(s);
+    const userSorted = expandOptions(userAnswer).map(clean).sort().join(';');
+    const dbSorted = expandOptions(dbAnswer).map(clean).sort().join(';');
+    return userSorted === dbSorted;
+  }
 }
