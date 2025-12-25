@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
+import { BecomeTeacherModal } from './BecomeTeacherModal';
 import {
   User, LogOut, Trophy, Target, TrendingUp,
   Award, Zap, Clock, CheckCircle2, XCircle, X, Mail
