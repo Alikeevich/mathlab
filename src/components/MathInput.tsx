@@ -27,7 +27,6 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     const mf = internalRef.current;
     if (!mf) return;
 
-    // === НАСТРОЙКИ ===
     mf.smartMode = true; 
     mf.virtualKeyboardMode = 'manual'; 
     mf.menuItems = []; 
@@ -37,23 +36,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
       onChange(e.target.value);
     };
 
-    const handleKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); 
-        onSubmit();
-      }
-    };
-
-    // === НОВЫЙ ХАК ОТ ПРЫЖКОВ ===
-    // Перехватываем событие фокуса самого элемента
-    const handleFocus = (e: FocusEvent) => {
-      // Это предотвращает некоторые браузерные сдвиги
-      // Но главное - мы контролируем это в Reactor через preventScroll
-    };
-
     mf.addEventListener('input', handleInput);
-    mf.addEventListener('keydown', handleKeydown);
-    mf.addEventListener('focus', handleFocus); // Добавили слушатель
 
     if (mfRef) mfRef.current = mf;
 
@@ -63,14 +46,12 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
 
     return () => {
       mf.removeEventListener('input', handleInput);
-      mf.removeEventListener('keydown', handleKeydown);
-      mf.removeEventListener('focus', handleFocus);
     };
   }, []);
 
   useEffect(() => {
     const mf = internalRef.current;
-    if (mf && value !== mf.value && document.activeElement !== mf) {
+    if (mf && value !== mf.value) {
       mf.setValue(value);
     }
   }, [value]);
@@ -88,10 +69,13 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
           color: 'white',
           border: 'none',
           outline: 'none',
-          // ВАЖНО: touch-action: none запрещает браузеру думать о скролле внутри поля
-          touchAction: 'none', 
-          '--caret-color': '#22d3ee', 
-          '--selection-background-color': 'rgba(34, 211, 238, 0.3)',
+          touchAction: 'none', // Запрещаем браузеру обрабатывать жесты
+          
+          // === УБИРАЕМ МИГАЮЩУЮ ПАЛКУ ===
+          '--caret-color': 'transparent', 
+          
+          // Оставляем подсветку выделения, чтобы было понятно, что происходит, но без палки
+          '--selection-background-color': 'rgba(34, 211, 238, 0.2)',
           '--contains-highlight-backgound-color': 'transparent',
         } as any}
       >
