@@ -44,6 +44,7 @@ export function Dashboard({ onClose }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
 
   useEffect(() => {
     loadAchievements();
@@ -104,6 +105,15 @@ export function Dashboard({ onClose }: DashboardProps) {
           </div>
 
           <div className="flex gap-3">
+            {profile && profile.role !== 'teacher' && !profile.is_admin && (
+              <button
+                onClick={() => setShowTeacherModal(true)}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Я учитель</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="hidden md:block px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
