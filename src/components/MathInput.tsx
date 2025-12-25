@@ -26,11 +26,12 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     const mf = internalRef.current;
     if (!mf) return;
 
-    // === НАСТРОЙКИ ДЛЯ СИСТЕМНОЙ КЛАВИАТУРЫ ===
+    // === НАСТРОЙКИ ===
     mf.smartMode = true; 
     
-    // 'off' означает: использовать нативную клавиатуру устройства (iOS/Android)
-    mf.virtualKeyboardMode = 'off'; 
+    // 'manual' запрещает MathLive открывать свою панель автоматически.
+    // Это дает шанс системной клавиатуре появиться (если MathLive не перехватит событие).
+    mf.virtualKeyboardMode = 'manual'; 
     
     mf.menuItems = []; 
     mf.keypressSound = null;
@@ -72,8 +73,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     <div className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden">
       <math-field
         ref={internalRef}
-        // Включаем системную клавиатуру
-        virtual-keyboard-mode="off"
+        virtual-keyboard-mode="manual"
         style={{
           width: '100%',
           fontSize: '24px',
