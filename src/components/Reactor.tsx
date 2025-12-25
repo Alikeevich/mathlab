@@ -101,20 +101,20 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
-      // Используем мягкий фокус, чтобы убедиться, что курсор активен
-      // preventScroll: true критически важен, чтобы экран не прыгал
+      // Используем мягкий фокус с preventScroll, чтобы экран не прыгал
       setTimeout(() => {
-        if (mfRef.current) mfRef.current.focus({ preventScroll: true });
+        if (mfRef.current) {
+          mfRef.current.focus({ preventScroll: true });
+        }
       }, 50);
     }
   }
 
   // === 3. УПРАВЛЕНИЕ КЛАВИАТУРОЙ ===
-  // Эта функция вызывается, когда ты жмешь на кнопки (цифры, sin, log и т.д.)
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
-    // Перед вводом убеждаемся, что фокус в поле, но без скролла
+    // Если фокус потерян (юзер кликнул мимо), возвращаем его аккуратно
     if (document.activeElement !== mfRef.current) {
        mfRef.current.focus({ preventScroll: true });
     }
@@ -128,7 +128,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
-    // Фокусируемся перед удалением
+    // Убеждаемся, что фокус на месте перед удалением
     if (document.activeElement !== mfRef.current) {
        mfRef.current.focus({ preventScroll: true });
     }
@@ -139,6 +139,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     if (!mfRef.current) return;
     mfRef.current.setValue('');
     setUserAnswer('');
+    // Возвращаем фокус без скролла
     mfRef.current.focus({ preventScroll: true });
   };
 
