@@ -9,74 +9,60 @@ type MathKeypadProps = {
 
 export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypadProps) {
   const keys = [
-    { label: '1', cmd: 'insert', arg: '1' },
-    { label: '2', cmd: 'insert', arg: '2' },
-    { label: '3', cmd: 'insert', arg: '3' },
-    { label: '+', cmd: 'insert', arg: '+' },
-    
-    { label: '4', cmd: 'insert', arg: '4' },
-    { label: '5', cmd: 'insert', arg: '5' },
-    { label: '6', cmd: 'insert', arg: '6' },
-    { label: '−', cmd: 'insert', arg: '-' },
-
-    { label: '7', cmd: 'insert', arg: '7' },
-    { label: '8', cmd: 'insert', arg: '8' },
-    { label: '9', cmd: 'insert', arg: '9' },
-    { label: '=', cmd: 'insert', arg: '=' },
-
-    { label: '0', cmd: 'insert', arg: '0' },
-    { label: '.', cmd: 'insert', arg: '.' },
-    { label: 'x', cmd: 'insert', arg: 'x' },
-    { label: '÷', cmd: 'insert', arg: '\\frac{#@}{#?}' }, 
-
+    // Ряд 1: Тригонометрия
     { label: 'sin', cmd: 'insert', arg: '\\sin(#?)' },
     { label: 'cos', cmd: 'insert', arg: '\\cos(#?)' },
     { label: 'tan', cmd: 'insert', arg: '\\tan(#?)' },
     { label: 'cot', cmd: 'insert', arg: '\\cot(#?)' },
 
+    // Ряд 2: Сложные функции (КВАДРАТИКИ!)
     { label: 'logₐ', cmd: 'insert', arg: '\\log_{#?}(#@)' }, 
     { label: '√', cmd: 'insert', arg: '\\sqrt{#?}' },
-    { label: 'xⁿ', cmd: 'insert', arg: '#@^{#?}' },
+    { label: 'xⁿ', cmd: 'insert', arg: '#@^{#?}' }, // Степень
+    { label: '÷', cmd: 'insert', arg: '\\frac{#@}{#?}' }, // Дробь (вертикальная, её нет на телефоне)
+
+    // Ряд 3: Спецсимволы
     { label: 'π', cmd: 'insert', arg: '\\pi' },
-    
     { label: '∞', cmd: 'insert', arg: '\\infty' },
     { label: '∅', cmd: 'insert', arg: '\\emptyset' },
     { label: '°', cmd: 'insert', arg: '^\\circ' },
-    { label: '←', cmd: 'perform', arg: 'moveToPreviousChar' },
   ];
 
-  // Эта функция - главная защита от скачков
-  const handlePress = (e: React.PointerEvent, action: () => void) => {
-    // Останавливаем всё, что браузер хочет сделать по умолчанию (скролл, зум, фокус)
+  // Функция для предотвращения потери фокуса (чтобы системная клавиатура не закрывалась при нажатии сюда)
+  const preventBlur = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    action();
+    // Не делаем stopPropagation, чтобы клики работали, но preventDefault не дает уйти фокусу
   };
 
   return (
-    <div className="grid grid-cols-4 gap-2 mb-4 select-none" style={{ touchAction: 'none' }}>
+    <div className="grid grid-cols-4 gap-2 mb-4 select-none">
       {keys.map((key, idx) => (
         <button
           key={idx}
           type="button"
-          // Используем onPointerDown - это универсально для мыши и пальца
-          onPointerDown={(e) => handlePress(e, () => onCommand(key.cmd, key.arg))}
-          className={`
-            py-3 rounded-xl font-bold text-lg md:text-xl transition-all active:scale-95 shadow-[0_2px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-[2px]
-            ${['sin', 'cos', 'tan', 'cot', 'logₐ'].includes(key.label) 
-              ? 'bg-slate-700 text-cyan-300 font-mono text-base' 
-              : key.label === '←' 
-                ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'}
-          `}
+          onMouseDown={preventBlur}
+          onTouchStart={preventBlur}
+          onClick={() => onCommand(key.cmd, key.arg)}
+          className="py-3 rounded-xl bg-slate-700 text-cyan-300 font-mono text-base font-bold shadow-md active:scale-95 transition-all hover:bg-slate-600"
         >
           {key.label}
         </button>
       ))}
 
-      {/* УПРАВЛЕНИЕ */}
+      {/* УПРАВЛЕНИЕ КУРСОРОМ (Полезно, чтобы двигаться внутри дробей/логарифмов) */}
       <button 
-        onPointerDown={(e) => handlePress(e, () => onCommand('perform', 'moveToNextChar'))}
+        onMouseDown={preventBlur}
+        onTouchStart={preventBlur}
+        onClick={() => onCommand('perform', 'moveToPreviousChar')} 
+        className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-slate-400 active:scale-95"
+      >
+        <ArrowLeft className="w-6 h-6 mx-auto" />
+      </button>
+
+      <button 
+        onMouseDown={preventBlur}
+        onTouchStart={preventBlur}
+        onClick={() => onCommand('perform', 'moveToNextChar')} 
         className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-slate-400 active:scale-95"
       >
         <ArrowRight className="w-6 h-6 mx-auto" />
@@ -84,23 +70,19 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
 
       {/* УДАЛЕНИЕ */}
       <button 
-        onPointerDown={(e) => handlePress(e, onDelete)}
+        onMouseDown={preventBlur}
+        onTouchStart={preventBlur}
+        onClick={onDelete} 
         className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 p-3 rounded-xl active:scale-95"
       >
         <Delete className="w-6 h-6 mx-auto" />
       </button>
       
-      {/* ОЧИСТКА */}
+      {/* ENTER (Отправка) */}
       <button 
-        onPointerDown={(e) => handlePress(e, onClear)}
-        className="bg-slate-800 border border-slate-700 text-slate-500 text-xs font-bold uppercase rounded-xl active:scale-95"
-      >
-        СБРОС
-      </button>
-
-      {/* ENTER */}
-      <button 
-        onPointerDown={(e) => handlePress(e, onSubmit)}
+        onMouseDown={preventBlur}
+        onTouchStart={preventBlur}
+        onClick={onSubmit}
         className="bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-xl shadow-lg shadow-emerald-900/20 active:scale-95"
       >
         <CornerDownLeft className="w-6 h-6 mx-auto" />

@@ -46,7 +46,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   // Храним LaTeX строку от MathLive
   const [userAnswer, setUserAnswer] = useState('');
   
-  // Ссылка на MathLive компонент
+  // Ссылка на компонент MathLive
   const mfRef = useRef<any>(null);
 
   const [result, setResult] = useState<'correct' | 'incorrect' | null>(null);
@@ -57,13 +57,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
-
-  // === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ФОКУСА ===
-  // Запрещает браузеру скроллить экран к элементу при возврате фокуса
-  const safeFocus = () => {
-    if (!mfRef.current) return;
-    mfRef.current.focus({ preventScroll: true });
-  };
 
   // === 1. ЗАГРУЗКА ЗАДАЧ ===
   useEffect(() => {
@@ -107,12 +100,11 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
-      // Используем безопасный фокус с небольшой задержкой
-      setTimeout(() => safeFocus(), 50);
+      // Не форсируем фокус, чтобы не вызывать клавиатуру принудительно
     }
   }
 
-  // === 3. ОБРАБОТЧИКИ КЛАВИАТУРЫ (С ЗАЩИТОЙ ОТ СКРОЛЛА) ===
+  // === 3. УПРАВЛЕНИЕ СПЕЦ-КЛАВИАТУРОЙ ===
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
@@ -122,23 +114,19 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
       mfRef.current.executeCommand([arg]);
     }
     
-    // Возвращаем фокус, только если он потерян, и делаем это мягко
-    if (document.activeElement !== mfRef.current) {
-        safeFocus();
-    }
+    // Фокус остается в поле благодаря preventDefault в MathKeypad,
+    // поэтому здесь мы его не вызываем, чтобы не триггерить скачки экрана.
   };
 
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
     mfRef.current.executeCommand(['deleteBackward']);
-    if (document.activeElement !== mfRef.current) safeFocus();
   };
 
   const handleKeypadClear = () => {
     if (!mfRef.current) return;
     mfRef.current.setValue('');
     setUserAnswer('');
-    if (document.activeElement !== mfRef.current) safeFocus();
   };
 
   // === 4. ПРОВЕРКА ОТВЕТА ===
@@ -303,7 +291,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                   />
                 </div>
 
-                {/* === KEYPAD (С ЗАЩИТОЙ ОТ БЛЮРА) === */}
+                {/* === НАША СПЕЦ-КЛАВИАТУРА === */}
                 <MathKeypad 
                   onCommand={handleKeypadCommand} 
                   onDelete={handleKeypadDelete}

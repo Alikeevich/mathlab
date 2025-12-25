@@ -26,11 +26,14 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     const mf = internalRef.current;
     if (!mf) return;
 
-    // === ЖЕСТКИЕ НАСТРОЙКИ (СКРЫВАЕМ СТАНДАРТНУЮ КЛАВУ) ===
+    // === НАСТРОЙКИ ДЛЯ СИСТЕМНОЙ КЛАВИАТУРЫ ===
     mf.smartMode = true; 
-    mf.virtualKeyboardMode = 'manual'; // Выключаем встроенную клаву
-    mf.menuItems = []; // Убираем меню
-    mf.keypressSound = null; // Без звука
+    
+    // 'off' означает: использовать нативную клавиатуру устройства (iOS/Android)
+    mf.virtualKeyboardMode = 'off'; 
+    
+    mf.menuItems = []; 
+    mf.keypressSound = null;
 
     const handleInput = (e: any) => {
       onChange(e.target.value);
@@ -46,10 +49,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     mf.addEventListener('input', handleInput);
     mf.addEventListener('keydown', handleKeydown);
 
-    // Связываем внешний реф с внутренним, чтобы Reactor видел компонент
-    if (mfRef) {
-      mfRef.current = mf;
-    }
+    if (mfRef) mfRef.current = mf;
 
     if (value !== mf.value) {
       mf.setValue(value);
@@ -61,7 +61,6 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     };
   }, []);
 
-  // Синхронизация при очистке поля извне
   useEffect(() => {
     const mf = internalRef.current;
     if (mf && value !== mf.value && document.activeElement !== mf) {
@@ -73,7 +72,8 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     <div className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden">
       <math-field
         ref={internalRef}
-        virtual-keyboard-mode="manual"
+        // Включаем системную клавиатуру
+        virtual-keyboard-mode="off"
         style={{
           width: '100%',
           fontSize: '24px',
