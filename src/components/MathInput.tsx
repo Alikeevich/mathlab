@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import 'mathlive';
 
-// Типизация для TypeScript, чтобы он не ругался на <math-field>
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -16,30 +15,33 @@ type Props = {
   value: string;
   onChange: (latex: string) => void;
   onSubmit: () => void;
-  mfRef?: React.MutableRefObject<any>; // Реф для клавиатуры
 };
 
-export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
+export function MathInput({ value, onChange, onSubmit }: Props) {
   const internalRef = useRef<any>(null);
 
   useEffect(() => {
     const mf = internalRef.current;
     if (!mf) return;
 
-    // Настройки MathLive для вида "как в Photomath"
-    mf.smartMode = true; 
-    mf.virtualKeyboardMode = 'manual'; // Отключаем встроенную клаву, у нас своя
-    mf.menuItems = []; // Убираем контекстное меню
+    // === НАСТРОЙКИ MATHLIVE ===
+    // 'onfocus' — клавиатура выезжает сама (как на телефоне)
+    mf.setOptions({
+      smartMode: true,
+      virtualKeyboardMode: 'onfocus', 
+      virtualKeyboardTheme: 'apple', // Тема как на iOS (светлая/темная)
+      menuItems: [], // Убираем кнопку "Меню" (три точки), она лишняя
+    });
 
-    // Слушаем изменения
+    // Слушаем ввод
     const handleInput = (e: any) => {
       onChange(e.target.value);
     };
 
-    // Слушаем Enter
+    // Слушаем Enter на физической клавиатуре (для ПК)
     const handleKeydown = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
-        e.preventDefault(); // Чтобы не было переноса строки
+        e.preventDefault();
         onSubmit();
       }
     };
@@ -47,9 +49,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     mf.addEventListener('input', handleInput);
     mf.addEventListener('keydown', handleKeydown);
 
-    if (mfRef) mfRef.current = mf;
-
-    // Инициализация значения
+    // Инициализация
     if (value !== mf.value) {
       mf.setValue(value);
     }
@@ -60,7 +60,7 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     };
   }, []);
 
-  // Синхронизация внешнего value с полем (если value изменилось извне, например очистка)
+  // Синхронизация при очистке поля извне
   useEffect(() => {
     const mf = internalRef.current;
     if (mf && value !== mf.value && document.activeElement !== mf) {
@@ -79,9 +79,8 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
           color: 'white',
           border: 'none',
           outline: 'none',
-          '--caret-color': '#22d3ee', // Цвет курсора (cyan-400)
+          '--caret-color': '#22d3ee',
           '--selection-background-color': 'rgba(34, 211, 238, 0.3)',
-          '--contains-highlight-backgound-color': 'transparent',
         } as any}
       >
         {value}
