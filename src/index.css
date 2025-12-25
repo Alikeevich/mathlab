@@ -33,3 +33,16 @@ body .ML__keyboard {
 .ML__suggestion-popover {
   display: none !important;
 }
+
+.ML__keyboard {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -9999 !important;
+}
+
+/* Скрываем тултипы и меню */
+.ML__suggestion-popover, 
+.ML__menu-container {
+  display: none !important;
+}
