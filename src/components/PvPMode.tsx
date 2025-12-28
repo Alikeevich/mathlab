@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer, WifiOff, ArrowLeft, Flag, AlertTriangle } from 'lucide-react';
 import { getPvPRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
+import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
-
 // Добавил проп initialDuelId
 type Props = {
   onBack: () => void;
@@ -17,23 +17,23 @@ type Props = {
 
 export function PvPMode({ onBack, initialDuelId }: Props) {
   const { user, profile, refreshProfile } = useAuth();
-  
+ 
   // Если есть ID для реконнекта - сразу ставим статус searching (как загрузка), иначе lobby
   const [status, setStatus] = useState<DuelState>(initialDuelId ? 'searching' : 'lobby');
   const [duelId, setDuelId] = useState<string | null>(initialDuelId || null);
-  
+ 
   const [opponentName, setOpponentName] = useState<string>('???');
   const [opponentMMR, setOpponentMMR] = useState<number>(1000);
-  
+ 
   const [problems, setProblems] = useState<any[]>([]);
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
   const [oppProgress, setOppProgress] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
+  const mfRef = useRef<any>(null);
   const [winner, setWinner] = useState<'me' | 'opponent' | 'draw' | null>(null);
-  const [mmrChange, setMmrChange] = useState<number | null>(null); 
-
+  const [mmrChange, setMmrChange] = useState<number | null>(null);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -55,29 +55,67 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
        if (duel) endGame(duel.winner_id, duel.elo_change);
        return;
     }
-
     // Определяем кто мы
     const isP1 = duel.player1_id === user?.id;
     const oppId = isP1 ? duel.player2_id : duel.player1_id;
-
     // Восстанавливаем состояние
     await loadProblems(duel.problem_ids);
     if (oppId) await fetchOpponentData(oppId);
-    
+   
     // Восстанавливаем прогресс
     setMyScore(isP1 ? duel.player1_score : duel.player2_score);
     setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
     setOppScore(isP1 ? duel.player2_score : duel.player1_score);
     setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
-
     // Запускаем подписку
     startBattleSubscription(id, isP1 ? 'player1' : 'player2');
     setStatus('battle');
   }
 
   // === ФУНКЦИИ КЛАВИАТУРЫ ===
-  const handleKeyInput = (s: string) => setUserAnswer(p => p + s);
-  const handleBackspace = () => setUserAnswer(p => p.slice(0, -1));
+  const handleKeypadCommand = (cmd: string, arg?: string) => {
+    if (!mfRef.current) return;
+   
+    // Сохраняем позицию скролла ДО изменения
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    if (cmd === 'insert') {
+      mfRef.current.executeCommand(['insert', arg]);
+    } else if (cmd === 'perform') {
+      mfRef.current.executeCommand([arg]);
+    }
+   
+    // Принудительно фиксируем скролл после изменения DOM
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+ 
+  const handleKeypadDelete = () => {
+    if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    mfRef.current.executeCommand(['deleteBackward']);
+   
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+ 
+  const handleKeypadClear = () => {
+    if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    mfRef.current.setValue('');
+    setUserAnswer('');
+   
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
 
   // === ЛОГИКА СДАЧИ ===
   const confirmSurrender = async () => {
@@ -102,6 +140,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   }, [status, feedback, currentProbIndex, problems.length]);
 
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
+
   const handleTimeout = () => submitResult(false);
 
   // === 2. HEARTBEAT ===
@@ -114,7 +153,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
         const isP1 = duelInfo.player1_id === user.id;
         const updateField = isP1 ? 'player1_last_seen' : 'player2_last_seen';
         await supabase.from('duels').update({ [updateField]: new Date().toISOString() }).eq('id', duelId);
-
         const { data } = await supabase.from('duels').select('player1_last_seen, player2_last_seen').eq('id', duelId).single();
         if (data) {
           const oppLastSeen = isP1 ? data.player2_last_seen : data.player1_last_seen;
@@ -139,7 +177,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           .select('status, winner_id, elo_change')
           .eq('id', duelId)
           .single();
-
         if (data && data.status === 'finished') {
           clearInterval(interval);
           endGame(data.winner_id, data.elo_change);
@@ -172,10 +209,9 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     const myMMR = profile?.mmr || 1000;
     const range = 300;
     const oldTime = new Date(Date.now() - 20000).toISOString();
-    
+   
     // Чистим старые зависшие заявки
     await supabase.from('duels').delete().eq('status', 'waiting').lt('last_seen', oldTime).is('tournament_id', null);
-
     // Ищем противника
     const { data: waitingDuel } = await supabase
       .from('duels')
@@ -187,7 +223,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       .lte('player1_mmr', myMMR + range)
       .limit(1)
       .maybeSingle();
-
     if (waitingDuel) {
       // Нашли! Присоединяемся
       setDuelId(waitingDuel.id);
@@ -213,7 +248,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   function startBattleSubscription(id: string, myRole: 'player1' | 'player2') {
     supabase.channel(`duel-${id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` }, 
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
       (payload) => {
         const newData = payload.new;
         if (newData.status === 'active' && status === 'searching') {
@@ -236,9 +271,9 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       .subscribe();
   }
 
-  async function handleAnswer(e: React.FormEvent) {
-    e.preventDefault();
-    if (!duelId || feedback || userAnswer.trim() === '') return; 
+  async function handleAnswer(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!duelId || feedback || userAnswer.trim() === '') return;
     const currentProb = problems[currentProbIndex];
     const isCorrect = checkAnswer(userAnswer, currentProb.answer);
     submitResult(isCorrect);
@@ -249,30 +284,33 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
-
     // ВАЖНО: Используем RPC, если он есть, иначе фоллбэк на прямой update (для совместимости)
     // Но лучше прямой update здесь, так как RPC у нас в TournamentPlay.
     // Для обычной PvP арены оставим пока прямой update, чтобы не ломать логику, если RPC настроен только для турниров.
     // Хотя лучше унифицировать. Оставим как было в твоем коде PvPMode:
-    
+   
     const { data: duel } = await supabase.from('duels').select('player1_id').eq('id', duelId!).single();
     if (duel) {
         const isP1 = duel.player1_id === user!.id;
-        const updateData = isP1 
+        const updateData = isP1
         ? { player1_score: newScore, player1_progress: newProgress, player1_last_seen: new Date().toISOString() }
         : { player2_score: newScore, player2_progress: newProgress, player2_last_seen: new Date().toISOString() };
-        
+       
         await supabase.from('duels').update(updateData).eq('id', duelId!);
-
         if (newProgress >= problems.length) {
            await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
         }
     }
-
     setTimeout(() => {
       setFeedback(null);
       setCurrentProbIndex(newProgress);
       setUserAnswer('');
+      if (mfRef.current) {
+        mfRef.current.setValue('');
+        setTimeout(() => {
+          mfRef.current.focus({ preventScroll: true });
+        }, 50);
+      }
     }, 1000);
   }
 
@@ -295,17 +333,25 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   function endGame(winnerId: string, eloChange: number = 0) {
     // Если статус уже finished, не вызываем повторно (чтобы не дергалось)
     if (status === 'finished') return;
-    
+   
     setStatus('finished');
-    setMmrChange(eloChange > 0 ? eloChange : 25); 
-
+    setMmrChange(eloChange > 0 ? eloChange : 25);
     if (winnerId === user!.id) {
         setWinner('me');
     } else {
         setWinner('opponent');
     }
-    refreshProfile(); 
+    refreshProfile();
   }
+
+  // Фокус на ввод при старте битвы
+  useEffect(() => {
+    if (status === 'battle' && mfRef.current) {
+      setTimeout(() => {
+        mfRef.current.focus({ preventScroll: true });
+      }, 50);
+    }
+  }, [status]);
 
   // === РЕНДЕР: ЛОББИ ===
   if (status === 'lobby') {
@@ -350,7 +396,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           <br/>
           (Ваш рейтинг: {profile?.mmr || 1000} MP)
         </div>
-        <button onClick={async () => { 
+        <button onClick={async () => {
            // При отмене поиска
            if (!initialDuelId) {
              // Если это обычный поиск - удаляем заявку
@@ -372,14 +418,13 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   if (status === 'battle') {
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
-        
+       
         {opponentDisconnected && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
             <WifiOff className="w-4 h-4" />
             <span>Соперник теряет соединение...</span>
           </div>
         )}
-
         {feedback && (
           <div className={`absolute inset-0 z-50 flex items-center justify-center rounded-3xl backdrop-blur-sm animate-in fade-in duration-200 ${
             feedback === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'
@@ -389,7 +434,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             </div>
           </div>
         )}
-
         {showSurrenderModal && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -409,9 +453,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             </div>
           </div>
         )}
-
         <div className="flex items-center justify-between mb-6 bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative">
-          <button 
+          <button
             onClick={() => setShowSurrenderModal(true)}
             className="absolute -top-12 left-0 md:static md:mr-4 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all flex items-center gap-2"
             title="Сдаться"
@@ -419,7 +462,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <Flag className="w-5 h-5" />
             <span className="text-xs font-bold hidden md:inline">СДАТЬСЯ</span>
           </button>
-
           <div className="text-right">
             <div className="text-cyan-400 font-bold text-lg">ВЫ</div>
             <div className="text-3xl font-black text-white">{myScore}/10</div>
@@ -435,7 +477,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <div className="text-3xl font-black text-white">{oppScore}/10</div>
           </div>
         </div>
-
         <div className="space-y-4 mb-6">
           <div>
              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -448,7 +489,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             </div>
           </div>
         </div>
-
         <div className="flex-1 flex flex-col justify-center">
           {currentProbIndex < problems.length && problems[currentProbIndex] ? (
             <div className="bg-slate-800 border border-slate-600 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
@@ -456,32 +496,30 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
                  <div className="text-slate-400 text-sm font-mono">ЗАДАЧА {currentProbIndex + 1}</div>
                  <div className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">Ввод ответа</div>
                </div>
-               
+              
                <h2 className="text-3xl font-bold text-white mb-8 leading-relaxed">
                  <Latex>{problems[currentProbIndex].question}</Latex>
                </h2>
-               
-               <form onSubmit={handleAnswer} className="flex flex-col gap-4">
-                 <div className="flex flex-col sm:flex-row gap-3">
-                   <input 
-                      autoFocus
-                      type="text" 
-                      value={userAnswer}
-                      onChange={e => setUserAnswer(e.target.value)}
-                      disabled={!!feedback}
-                      className="w-full flex-1 bg-slate-900 border border-slate-600 rounded-xl px-6 py-4 text-xl text-white outline-none focus:border-cyan-500 transition-colors disabled:opacity-50 font-mono"
-                      placeholder="Ваш ответ..."
+              
+               <div className="flex flex-col gap-4">
+                 <div className="mb-4">
+                   <label className="block text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                     Ввод решения
+                   </label>
+                   <MathInput
+                     value={userAnswer}
+                     onChange={setUserAnswer}
+                     onSubmit={() => handleAnswer()}
+                     mfRef={mfRef}
                    />
-                   <button 
-                      type="submit" 
-                      disabled={!!feedback || userAnswer.trim() === ''}
-                      className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl transition-colors disabled:cursor-not-allowed"
-                   >
-                     GO
-                   </button>
                  </div>
-                 <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
-               </form>
+                 <MathKeypad
+                   onCommand={handleKeypadCommand}
+                   onDelete={handleKeypadDelete}
+                   onClear={handleKeypadClear}
+                   onSubmit={() => handleAnswer()}
+                 />
+               </div>
             </div>
           ) : (
              <div className="flex items-center justify-center h-full">
@@ -541,6 +579,5 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       </div>
     );
   }
-
   return null;
 }
