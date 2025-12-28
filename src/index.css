@@ -46,3 +46,37 @@ body .ML__keyboard {
 .ML__menu-container {
   display: none !important;
 }
+
+
+/* === ГЛОБАЛЬНАЯ ЗАЩИТА ОТ СКАЧКОВ (App-like behavior) === */
+html, body {
+  margin: 0;
+  padding: 0;
+  /* Запрещаем скролл самого окна браузера */
+  overflow: hidden; 
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  height: 100dvh; /* Учитываем динамические панели мобилок */
+  overscroll-behavior: none; /* Запрет "пружинки" на iOS */
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto; /* Скроллим только контент внутри App */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Убираем подсветку тапа на мобилках */
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Защита MathField */
+math-field {
+  outline: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+}

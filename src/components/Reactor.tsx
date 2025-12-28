@@ -100,34 +100,48 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     }
   }
 
-  // === 3. ОБРАБОТКА НАЖАТИЙ (ИСПРАВЛЕНО) ===
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     
-    // УБРАЛ ВЫЗОВ .focus() ОТСЮДА! 
-    // Клавиатура сама держит фокус через preventDefault.
-    // Браузер теперь не будет пытаться скроллить к полю.
-
+    // Сохраняем позицию скролла ДО изменения
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+    
     if (cmd === 'insert') {
       mfRef.current.executeCommand(['insert', arg]);
     } else if (cmd === 'perform') {
       mfRef.current.executeCommand([arg]);
     }
+    
+    // Принудительно фиксируем скролл после изменения DOM
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
   };
-
+  
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+    
     mfRef.current.executeCommand(['deleteBackward']);
+    
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
   };
-
+  
   const handleKeypadClear = () => {
     if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+    
     mfRef.current.setValue('');
     setUserAnswer('');
-    // При полной очистке можно мягко вернуть фокус, если он пропал
-    if (document.activeElement !== mfRef.current) {
-       mfRef.current.focus({ preventScroll: true });
-    }
+    
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
   };
 
   // === 4. ОТПРАВКА ===
