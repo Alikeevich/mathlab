@@ -8,22 +8,23 @@ type MathKeypadProps = {
   onSubmit: () => void;
 };
 
-export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypadProps) {
-  const [isMainPage, setIsMainPage] = useState(true);
+// Тип для вкладок клавиатуры
+type Tab = 'num' | 'abc' | 'sym';
 
-  // ЯДЕРНАЯ ЗАЩИТА ОТ ПРЫЖКОВ
+export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypadProps) {
+  // Состояние: теперь 3 режима вместо 2
+  const [activeTab, setActiveTab] = useState<Tab>('num');
+
+  // ЯДЕРНАЯ ЗАЩИТА ОТ СКАЧКОВ (Оставляем как было, это святое)
   const preventAll = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
   };
 
-  // Обертка для клика с восстановлением скролла
   const handleSafeClick = (action: () => void) => {
     return (e: React.MouseEvent | React.TouchEvent) => {
       preventAll(e);
       action();
-      
-      // Если браузер все-таки дернулся, возвращаем скролл на место в следующем кадре
       const scrollY = window.scrollY;
       const scrollX = window.scrollX;
       requestAnimationFrame(() => {
@@ -32,11 +33,14 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
     };
   };
 
+  // === НАБОРЫ КНОПОК ===
+
+  // 1. Символы (бывшая 2-я страница)
   const symbolsKeys = [
     { label: '[ ]', cmd: 'insert', arg: '\\left[#?\\right]' },
     { label: '( )', cmd: 'insert', arg: '\\left(#?\\right)' },
     { label: '{ }', cmd: 'insert', arg: '\\left\\{#?\\right\\}' },
-    { label: '|x|', cmd: 'insert', arg: '\\left|#?\\right|' },
+    { label: '|a|', cmd: 'insert', arg: '\\left|#?\\right|' },
 
     { label: '≠', cmd: 'insert', arg: '\\neq' },
     { label: '≈', cmd: 'insert', arg: '\\approx' },
@@ -54,19 +58,40 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
     { label: '≥', cmd: 'insert', arg: '\\ge' },
   ];
 
-  // Супер-защищенная кнопка
+  // 2. Буквы (НОВОЕ) - Самые частые переменные в школе
+  const lettersKeys = [
+    'x', 'y', 'z', 't',
+    'a', 'b', 'c', 'd',
+    'm', 'n', 'k', 'p',
+    'u', 'v', 'S', 'f'
+  ];
+
+  // Компонент Кнопки (с защитой)
   const Key = ({ label, onClick, className, children }: any) => (
     <button
       onPointerDown={preventAll}
       onTouchStart={preventAll}
       onClick={handleSafeClick(onClick)}
-      tabIndex={-1} // Запрещаем фокус на кнопке
+      tabIndex={-1} 
       className={`relative rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-[0_2px_0_0_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-[2px] ${className}`}
       style={{ touchAction: 'none' }}
     >
       {children || label}
     </button>
   );
+
+  // Логика переключения вкладки
+  const toggleTab = () => {
+    if (activeTab === 'num') setActiveTab('abc');
+    else if (activeTab === 'abc') setActiveTab('sym');
+    else setActiveTab('num');
+  };
+
+  const getTabLabel = () => {
+    if (activeTab === 'num') return 'ABC';
+    if (activeTab === 'abc') return '#+=';
+    return '123';
+  };
 
   return (
     <div className="flex flex-col gap-2 select-none pb-2" style={{ touchAction: 'none' }}>
@@ -80,9 +105,12 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       </div>
 
       <div className="flex gap-2">
-        {/* ЛЕВАЯ ЧАСТЬ */}
+        
+        {/* ЛЕВАЯ ЧАСТЬ (МЕНЯЕТСЯ) */}
         <div className="flex-1 flex flex-col gap-2">
-           {isMainPage ? (
+           
+           {activeTab === 'num' && (
+             // === ЦИФРЫ ===
              <>
                <div className="grid grid-cols-4 gap-2">
                   <Key onClick={() => onCommand('insert', '\\sin(#?)')} className="bg-slate-700 text-cyan-300 text-sm py-3">sin</Key>
@@ -92,43 +120,57 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                </div>
                
                <div className="grid grid-cols-3 gap-2">
-                  <Key onClick={() => onCommand('insert', '7')} className="bg-slate-800 text-white text-2xl py-3">7</Key>
-                  <Key onClick={() => onCommand('insert', '8')} className="bg-slate-800 text-white text-2xl py-3">8</Key>
-                  <Key onClick={() => onCommand('insert', '9')} className="bg-slate-800 text-white text-2xl py-3">9</Key>
+                  {['7','8','9','4','5','6','1','2','3'].map(n => (
+                    <Key key={n} onClick={() => onCommand('insert', n)} className="bg-slate-800 text-white text-2xl py-3">{n}</Key>
+                  ))}
                </div>
                <div className="grid grid-cols-3 gap-2">
-                  <Key onClick={() => onCommand('insert', '4')} className="bg-slate-800 text-white text-2xl py-3">4</Key>
-                  <Key onClick={() => onCommand('insert', '5')} className="bg-slate-800 text-white text-2xl py-3">5</Key>
-                  <Key onClick={() => onCommand('insert', '6')} className="bg-slate-800 text-white text-2xl py-3">6</Key>
-               </div>
-               <div className="grid grid-cols-3 gap-2">
-                  <Key onClick={() => onCommand('insert', '1')} className="bg-slate-800 text-white text-2xl py-3">1</Key>
-                  <Key onClick={() => onCommand('insert', '2')} className="bg-slate-800 text-white text-2xl py-3">2</Key>
-                  <Key onClick={() => onCommand('insert', '3')} className="bg-slate-800 text-white text-2xl py-3">3</Key>
-               </div>
-               <div className="grid grid-cols-3 gap-2">
-                  <Key onClick={() => setIsMainPage(false)} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm py-3">#+=</Key>
+                  {/* Кнопка переключения */}
+                  <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm py-3">{getTabLabel()}</Key>
                   <Key onClick={() => onCommand('insert', '0')} className="bg-slate-800 text-white text-2xl py-3">0</Key>
                   <Key onClick={() => onCommand('insert', '.')} className="bg-slate-800 text-white text-2xl py-3">.</Key>
                </div>
              </>
-           ) : (
+           )}
+
+           {activeTab === 'abc' && (
+             // === БУКВЫ (НОВАЯ ВКЛАДКА) ===
+             <>
+               <div className="grid grid-cols-4 gap-2 h-full content-start">
+                  {lettersKeys.map((char) => (
+                    <Key key={char} onClick={() => onCommand('insert', char)} className="bg-slate-700 text-white text-xl py-3 font-serif italic">
+                      {char}
+                    </Key>
+                  ))}
+                  {/* Греческие (бонус) */}
+                  <Key onClick={() => onCommand('insert', '\\alpha')} className="bg-slate-700 text-cyan-300 py-3">α</Key>
+                  <Key onClick={() => onCommand('insert', '\\beta')} className="bg-slate-700 text-cyan-300 py-3">β</Key>
+                  <Key onClick={() => onCommand('insert', '\\pi')} className="bg-slate-700 text-cyan-300 py-3 font-serif">π</Key>
+                  
+                  {/* Кнопка возврата к цифрам */}
+                  <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm py-3">{getTabLabel()}</Key>
+               </div>
+             </>
+           )}
+
+           {activeTab === 'sym' && (
+             // === СИМВОЛЫ ===
              <>
                <div className="grid grid-cols-4 gap-2 h-full content-start">
                   {symbolsKeys.map((k, i) => (
                     <Key key={i} onClick={() => onCommand(k.cmd, k.arg)} className="bg-slate-700 text-cyan-300 py-3">{k.label}</Key>
                   ))}
-                  <Key onClick={() => onCommand('insert', '\\pi')} className="bg-slate-700 text-cyan-300 py-3 font-serif">π</Key>
-                  <Key onClick={() => onCommand('insert', '^\\circ')} className="bg-slate-700 text-cyan-300 py-3">°</Key>
                   <Key onClick={() => onCommand('insert', '\\tan(#?)')} className="bg-slate-700 text-cyan-300 text-sm py-3">tan</Key>
                   <Key onClick={() => onCommand('insert', '\\cot(#?)')} className="bg-slate-700 text-cyan-300 text-sm py-3">cot</Key>
-                  <Key onClick={() => setIsMainPage(true)} className="col-span-4 bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm py-3 mt-auto">123 (ЦИФРЫ)</Key>
+                  <Key onClick={() => onCommand('insert', '^\\circ')} className="bg-slate-700 text-cyan-300 py-3">°</Key>
+                  
+                  <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm py-3">{getTabLabel()}</Key>
                </div>
              </>
            )}
         </div>
 
-        {/* ПРАВАЯ КОЛОНКА */}
+        {/* ПРАВАЯ КОЛОНКА (ОСТАЕТСЯ ВСЕГДА) */}
         <div className="w-1/4 flex flex-col gap-2">
            <Key onClick={() => onCommand('insert', '\\frac{#@}{#?}')} className="bg-slate-700 text-white text-xl py-4 flex-1">÷</Key>
            <Key onClick={() => onCommand('insert', '\\cdot')} className="bg-slate-700 text-white text-xl py-4 flex-1">×</Key>
