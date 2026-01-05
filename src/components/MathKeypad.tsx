@@ -183,9 +183,7 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       {/* НИЖНЯЯ ПАНЕЛЬ */}
       <div className="grid grid-cols-4 gap-2 mt-1">
          <Key onClick={() => onCommand('insert', '\\log_{#?}(#@)')} className="bg-slate-700 text-cyan-300 text-sm font-bold">logₐ</Key>
-         <Key onClick={() => onCommand('insert', ' ')} className="col-span-2 bg-slate-600 text-slate-300 border-b-4 border-slate-800 active:border-b-0 active:translate-y-[4px]">
-            <Space className="w-6 h-6" />
-         </Key>
+         
          <Key onClick={onSubmit} className="bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"><CornerDownLeft className="w-6 h-6"/></Key>
       </div>
 
