@@ -2,33 +2,48 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
-    <!-- CSP: Разрешаем выполнение скриптов, eval (для математики) и загрузку ресурсов -->
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline'; font-src * data:;" />
-    
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- === ИКОНКИ ДЛЯ ГУГЛА И БРАУЗЕРОВ === -->
-    <!-- 1. Основная иконка (должна лежать в папке public) -->
+    <!-- === ИКОНКИ === -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
-    
-    <!-- 2. PNG иконка (для современного Chrome/Firefox) -->
     <link rel="icon" type="image/png" sizes="32x32" href="/meerkat/avatar.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/meerkat/avatar.png" />
-    
-    <!-- 3. Apple Touch Icon (для iPhone и закладок) -->
     <link rel="apple-touch-icon" href="/meerkat/avatar.png" />
-    
-    <!-- SEO ТЕГИ -->
+    <!-- Если файла manifest.json еще нет, браузер может ругаться в консоли, но белый экран это не вызовет -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- === SEO & SOCIAL === -->
     <title>MathLab PvP — Подготовка к ЕНТ по Математике</title>
-    <meta name="description" content="Первая в Казахстане PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями, прокачивай своего питомца и участвуй в турнирах." />
+    <meta name="description" content="PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями и участвуй в турнирах бесплатно." />
     <meta name="theme-color" content="#0f172a" />
-    <link rel="canonical" href="https://mathlabpvp.org/" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+    
+    <!-- Open Graph (для красивых ссылок в WhatsApp/Telegram) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mathlabpvp.org/" />
+    <meta property="og:title" content="MathLab PvP — Вызови друга на дуэль!" />
+    <meta property="og:description" content="Кто быстрее решит задачи? Проверь себя и подготовься к ЕНТ." />
+    <meta property="og:image" content="https://mathlabpvp.org/meerkat/og-preview.png" />
+
+    <!-- Schema.org (для Гугла) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MathLab PvP",
+      "applicationCategory": "EducationalGame",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KZT"
+      }
+    }
+    </script>
   </head>
   <body>
-    <!-- Точка входа React -->
+    <!-- САМОЕ ВАЖНОЕ: Сюда React вставляет всё приложение -->
     <div id="root"></div>
+    
+    <!-- Ссылка на твой главный файл -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
