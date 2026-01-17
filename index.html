@@ -3,47 +3,70 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- === БАЗОВЫЕ SEO ТЕГИ === -->
+    <title>MathLab PvP — Подготовка к ЕНТ по Математике</title>
+    <meta name="description" content="PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями и участвуй в турнирах бесплатно. Идеально для школьников Казахстана." />
+    <meta name="keywords" content="математика, ЕНТ, подготовка к ЕНТ, математика онлайн, mathlab, pvp математика, игры для школы, онлайн репетитор" />
+    <meta name="author" content="MathLab Team" />
+    <meta name="publisher" content="MathLab PvP" />
     
+    <!-- Инструкция для роботов (индексировать всё) -->
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Каноническая ссылка (говорит Гуглу, что это главная страница) -->
+    <link rel="canonical" href="https://mathlabpvp.org/" />
+
     <!-- === ИКОНКИ === -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/meerkat/avatar.png" />
     <link rel="apple-touch-icon" href="/meerkat/avatar.png" />
-    <!-- Если файла manifest.json еще нет, браузер может ругаться в консоли, но белый экран это не вызовет -->
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- === SEO & SOCIAL === -->
-    <title>MathLab PvP — Подготовка к ЕНТ по Математике</title>
-    <meta name="description" content="PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями и участвуй в турнирах бесплатно." />
-    <meta name="theme-color" content="#0f172a" />
-    
-    <!-- Open Graph (для красивых ссылок в WhatsApp/Telegram) -->
+    <!-- === OPEN GRAPH (Facebook, WhatsApp, Telegram) === -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MathLab PvP" />
     <meta property="og:url" content="https://mathlabpvp.org/" />
     <meta property="og:title" content="MathLab PvP — Вызови друга на дуэль!" />
-    <meta property="og:description" content="Кто быстрее решит задачи? Проверь себя и подготовься к ЕНТ." />
+    <meta property="og:description" content="Кто быстрее решит задачи? Проверь себя и подготовься к ЕНТ в игровом формате." />
+    
+    <!-- ВАЖНО: Тут должна быть ПОЛНАЯ ссылка с https:// -->
     <meta property="og:image" content="https://mathlabpvp.org/meerkat/og-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
 
-    <!-- Schema.org (для Гугла) -->
+    <!-- === TWITTER CARD (X) === -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://mathlabpvp.org/" />
+    <meta name="twitter:title" content="MathLab PvP — Битва Умов" />
+    <meta name="twitter:description" content="Готовься к ЕНТ играя. PvP битвы, турниры и прокачка персонажа." />
+    <meta name="twitter:image" content="https://mathlabpvp.org/meerkat/og-preview.png" />
+
+    <!-- === SCHEMA.ORG (JSON-LD) === -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "MathLab PvP",
+      "url": "https://mathlabpvp.org",
       "applicationCategory": "EducationalGame",
-      "operatingSystem": "Any",
+      "operatingSystem": "Web Browser",
       "offers": {
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "KZT"
-      }
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "MathLab Team"
+      },
+      "description": "Бесплатная образовательная онлайн-игра для подготовки школьников к ЕНТ по математике через PvP сражения."
     }
     </script>
   </head>
   <body>
-    <!-- САМОЕ ВАЖНОЕ: Сюда React вставляет всё приложение -->
     <div id="root"></div>
-    
-    <!-- Ссылка на твой главный файл -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
