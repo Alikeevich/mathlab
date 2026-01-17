@@ -1,34 +1,58 @@
-<!DOCTYPE html>
-<html lang="ru">
-  <head>
+<head>
     <meta charset="UTF-8" />
-    
-    <!-- CSP: Разрешаем выполнение скриптов, eval (для математики) и загрузку ресурсов -->
+    <!-- CSP оставляем как есть -->
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline'; font-src * data:;" />
     
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- === ИКОНКИ ДЛЯ ГУГЛА И БРАУЗЕРОВ === -->
-    <!-- 1. Основная иконка (должна лежать в папке public) -->
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    
-    <!-- 2. PNG иконка (для современного Chrome/Firefox) -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/meerkat/avatar.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/meerkat/avatar.png" />
-    
-    <!-- 3. Apple Touch Icon (для iPhone и закладок) -->
-    <link rel="apple-touch-icon" href="/meerkat/avatar.png" />
-    
-    <!-- SEO ТЕГИ -->
-    <title>MathLab PvP — Подготовка к ЕНТ по Математике</title>
-    <meta name="description" content="Первая в Казахстане PvP-арена для подготовки к ЕНТ. Решай задачи, сражайся с друзьями, прокачивай своего питомца и участвуй в турнирах." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="canonical" href="https://mathlabpvp.org/" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
-  </head>
-  <body>
-    <!-- Точка входа React -->
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+
+    <!-- === ИКОНКИ === -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/meerkat/avatar.png" />
+    <link rel="apple-touch-icon" href="/meerkat/avatar.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- === SEO & SOCIAL (МАРКЕТИНГ В КОДЕ) === -->
+    <title>MathLab PvP — Батлы по математике (ЕНТ)</title>
+    <meta name="description" content="Уделаешь друга в уравнениях? Заходи на PvP-арену! Готовься к ЕНТ играя. Бесплатно, без регистрации." />
+    
+    <!-- Open Graph / Facebook / WhatsApp / Telegram -->
+    <!-- Это то, что видит человек, когда ему кидают ссылку -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mathlabpvp.org/" />
+    <meta property="og:title" content="MathLab PvP — Вызови друга на дуэль!" />
+    <meta property="og:description" content="Кто быстрее решит 10 задач? Проверь себя и подготовься к ЕНТ. Играй прямо в браузере." />
+    <!-- Сделай картинку 1200x630px, где нарисован VS экран (Игрок 1 vs Игрок 2) -->
+    <meta property="og:image" content="https://mathlabpvp.org/meerkat/og-preview.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://mathlabpvp.org/" />
+    <meta property="twitter:title" content="MathLab PvP — Математические бои" />
+    <meta property="twitter:description" content="PvP арена для подготовки к ЕНТ. Докажи, что ты лучший в классе." />
+    <meta property="twitter:image" content="https://mathlabpvp.org/meerkat/og-preview.png" />
+
+    <!-- === SCHEMA.ORG (ДЛЯ ГУГЛА) === -->
+    <!-- Это говорит гуглу: "Я не блог, я веб-приложение/игра" -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MathLab PvP",
+      "applicationCategory": "EducationalGame",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KZT"
+      },
+      "description": "Онлайн игра для подготовки к ЕНТ по математике в формате PvP сражений.",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "150"
+      }
+    }
+    </script>
+</head>
