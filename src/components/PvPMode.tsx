@@ -6,6 +6,7 @@ import { Zap, Loader, Trophy, XCircle, Play, CheckCircle2, Timer, WifiOff, Arrow
 import { getPvPRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
+import { useBotOpponent } from '../hooks/useBotOpponent';
 import { checkAnswer } from '../lib/mathUtils';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
@@ -23,7 +24,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
  
   const [opponentName, setOpponentName] = useState<string>('???');
   const [opponentMMR, setOpponentMMR] = useState<number>(1000);
- 
+  const [isBotMatch, setIsBotMatch] = useState(false);
   const [problems, setProblems] = useState<any[]>([]);
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
@@ -43,6 +44,22 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
+
+  useBotOpponent({
+    isEnabled: isBotMatch && status === 'battle',
+    difficulty: 'medium', // Можно сделать зависимость от MMR: profile?.mmr > 1200 ? 'hard' : 'easy'
+    maxQuestions: problems.length || 10,
+    onProgressUpdate: (score, progress) => {
+      // Когда бот "решает", мы просто обновляем локальный стейт
+      setOppScore(score);
+      setOppProgress(progress);
+      
+      // Если бот закончил раньше нас — он победил
+      if (progress >= (problems.length || 10)) {
+          endGame('bot_id', -25); // Бот победил
+      }
+    }
+  });
 
   // === 1. АВТО-РЕКОННЕКТ (ЕСЛИ ОБНОВИЛ СТРАНИЦУ) ===
   useEffect(() => {
