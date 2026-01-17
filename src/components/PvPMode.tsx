@@ -45,6 +45,22 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
 
+  useBotOpponent({
+    isEnabled: isBotMatch && status === 'battle',
+    difficulty: 'medium', // Можно сделать зависимость от MMR: profile?.mmr > 1200 ? 'hard' : 'easy'
+    maxQuestions: problems.length || 10,
+    onProgressUpdate: (score, progress) => {
+      // Когда бот "решает", мы просто обновляем локальный стейт
+      setOppScore(score);
+      setOppProgress(progress);
+      
+      // Если бот закончил раньше нас — он победил
+      if (progress >= (problems.length || 10)) {
+          endGame('bot_id', -25); // Бот победил
+      }
+    }
+  });
+
   // === 1. АВТО-РЕКОННЕКТ (ЕСЛИ ОБНОВИЛ СТРАНИЦУ) ===
   useEffect(() => {
     if (initialDuelId && status === 'searching') {
