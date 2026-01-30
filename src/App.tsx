@@ -27,7 +27,6 @@ import { AdminDashboard } from './components/AdminDashboard';
 import PixelBlast from './components/PixelBlast';
 import { Header } from './components/Header';
 import { StickyReconnect } from './components/StickyReconnect';
-import { SpeedInsights } from "@vercel/speed-insights/next"
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
