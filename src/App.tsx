@@ -1,32 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Auth } from './components/Auth';
 import { LandingPage } from './components/LandingPage';
-import { LabMap } from './components/LabMap';
-import { ModuleViewer } from './components/ModuleViewer';
-import { Reactor } from './components/Reactor';
+import { Header } from './components/Header';
+import { StickyReconnect } from './components/StickyReconnect';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ
 import { Crown, Settings, Shield, Zap, Keyboard, Lock } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
 import { Leaderboard } from './components/Leaderboard';
 import { Onboarding } from './components/Onboarding';
-import { PvPMode } from './components/PvPMode';
 import { VideoArchive } from './components/VideoArchive';
 import { TournamentAdmin } from './components/TournamentAdmin';
-import { TournamentLobby } from './components/TournamentLobby';
 import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
 import { LevelUpManager } from './components/LevelUpManager';
 import { LegalModal } from './components/LegalModal';
 import { AdminDashboard } from './components/AdminDashboard';
-import PixelBlast from './components/PixelBlast';
-import { Header } from './components/Header';
-import { StickyReconnect } from './components/StickyReconnect';
+
+// Тяжёлые экраны — lazy, чтобы не блокировать FCP (mathlive, three.js, KaTeX в чанках)
+const PixelBlast = lazy(() => import('./components/PixelBlast'));
+const LabMap = lazy(() => import('./components/LabMap').then(m => ({ default: m.LabMap })));
+const ModuleViewer = lazy(() => import('./components/ModuleViewer').then(m => ({ default: m.ModuleViewer })));
+const Reactor = lazy(() => import('./components/Reactor').then(m => ({ default: m.Reactor })));
+const PvPMode = lazy(() => import('./components/PvPMode').then(m => ({ default: m.PvPMode })));
+const TournamentLobby = lazy(() => import('./components/TournamentLobby').then(m => ({ default: m.TournamentLobby })));
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
@@ -227,8 +227,8 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">
-        Загрузка...
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400" style={{ minHeight: '100dvh' }}>
+        <span>Загрузка...</span>
       </div>
     );
   }
@@ -264,9 +264,10 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
       
-      {/* ФОНОВАЯ АНИМАЦИЯ */}
+      {/* ФОНОВАЯ АНИМАЦИЯ — lazy, three.js не блокирует FCP */}
       <div className="absolute inset-0 z-0">
-        <PixelBlast
+        <Suspense fallback={<div className="absolute inset-0 bg-slate-900/50" />}>
+          <PixelBlast
           variant="circle"
           pixelSize={6}
           color="#B19EEF"
@@ -285,6 +286,7 @@ function MainApp() {
           edgeFade={0.25}
           transparent
         />
+        </Suspense>
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
       </div>
 
@@ -324,8 +326,9 @@ function MainApp() {
           onShowAuth={() => setShowAuthModal(true)}
         />
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT — lazy-экраны с fallback без сдвига layout */}
         <main className="relative z-0 pb-24 md:pb-20 flex-1">
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-cyan-400/60 min-h-[50vh]"><span>Загрузка...</span></div>}>
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
@@ -388,6 +391,7 @@ function MainApp() {
           {user && view === 'tournament_lobby' && activeTournamentId && (
             <TournamentLobby tournamentId={activeTournamentId} />
           )}
+          </Suspense>
         </main>
       </div>
 

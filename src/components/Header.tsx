@@ -67,6 +67,8 @@ export function Header({
                <img 
                  src="/logo.png" 
                  alt="MathLab" 
+                 width={40}
+                 height={40}
                  className="w-full h-full object-cover"
                  onError={(e) => { 
                    e.currentTarget.style.display='none'; 
@@ -100,26 +102,30 @@ export function Header({
                     )}
                   </button>
 
-                  {/* КНОПКА СУРИКАТА */}
-                  {profile?.companion_name && (
-                    <button 
-                      onClick={onShowCompanion}
-                      className="relative group p-1 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors mr-1"
-                      title={`Домик ${profile.companion_name}`}
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
-                        <img 
-                          src="/meerkat/avatar.png" 
-                          alt="Pet" 
-                          className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                          onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
-                        />
-                      </div>
-                      {profile.companion_hunger < 30 && (
-                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
-                      )}
-                    </button>
-                  )}
+                  {/* КНОПКА СУРИКАТА — всегда резервируем место, чтобы не было CLS при появлении */}
+                  <div className="w-10 h-10 flex items-center justify-center shrink-0 mr-1">
+                    {profile?.companion_name ? (
+                      <button 
+                        onClick={onShowCompanion}
+                        className="relative group p-1 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors w-full h-full"
+                        title={`Домик ${profile.companion_name}`}
+                      >
+                        <div className="w-8 h-8 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden mx-auto">
+                          <img 
+                            src="/meerkat/avatar.png" 
+                            alt="Pet" 
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-contain group-hover:scale-110 transition-transform"
+                            onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
+                          />
+                        </div>
+                        {profile.companion_hunger < 30 && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
 
                   <button onClick={onShowArchive} className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title="Архив Знаний">
                     <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
