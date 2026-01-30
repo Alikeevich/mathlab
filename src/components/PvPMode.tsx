@@ -284,9 +284,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
               await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
            }
        }
-    } else {
-       // Логика с БОТОМ
-       // Обновляем только себя в базе
+  } else {
        await supabase.from('duels').update({ 
            player1_score: newScore, 
            player1_progress: newProgress,
@@ -294,9 +292,15 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
        }).eq('id', duelId!);
 
        if (newProgress >= problems.length) {
-          // Мы закончили первыми против бота -> ПОБЕДА
           await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
-          endGame('me', 25); // +25 MMR за победу над ботом
+          
+          if (newScore > oppScore) {
+             endGame('me', 25); // Вы набрали больше очков
+          } else if (newScore < oppScore) {
+             endGame('opponent', -20); // Бот набрал больше очков
+          } else {
+             endGame('me', 10); 
+          }
        }
     }
 
