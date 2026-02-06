@@ -18,10 +18,12 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
  
   const [activeDuelId, setActiveDuelId] = useState<string | null>(null);
   
-  // ИСПРАВЛЕНИЕ: Состояние для ReconnectModal
   const [showReconnect, setShowReconnect] = useState(false);
   const [reconnectTournamentId, setReconnectTournamentId] = useState<string | null>(null);
   const [reconnectDuelId, setReconnectDuelId] = useState<string | null>(null);
+
+  // === ИСПРАВЛЕНИЕ: Флаг для предотвращения повторных проверок ===
+  const [hasCheckedReconnect, setHasCheckedReconnect] = useState(false);
 
   useEffect(() => {
     async function loadInfo() {
@@ -36,22 +38,29 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     }
 
     async function checkActiveTournament() {
-      if (!user) return;
+      if (!user || hasCheckedReconnect) return;
       
-      // ИСПРАВЛЕНИЕ: Проверяем, есть ли активное участие в турнире
+      // === ИСПРАВЛЕНИЕ: Проверяем только если это НЕ текущий турнир ===
       const { data: participation, error } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
         .eq('user_id', user.id)
-        .single();
+        .neq('tournament_id', tournamentId)
+        .in('tournaments.status', ['active', 'waiting'])
+        .maybeSingle();
+
+      // Помечаем, что проверку выполнили
+      setHasCheckedReconnect(true);
 
       if (error || !participation) {
         loadInfo();
         return;
       }
 
+      // Если есть другой активный турнир — предлагаем переподключиться
       if (['active', 'waiting'].includes(participation.tournaments.status)) {
         setReconnectTournamentId(participation.tournament_id);
+        
         // Проверяем активный дуэль
         const { data: duel } = await supabase
           .from('duels')
@@ -59,39 +68,45 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           .eq('tournament_id', participation.tournament_id)
           .eq('status', 'active')
           .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-          .single();
+          .maybeSingle();
+        
         if (duel) setReconnectDuelId(duel.id);
-        setShowReconnect(true); // Показываем модалку
+        setShowReconnect(true);
         return;
       }
       
-      // Если нет — продолжаем загрузку как раньше
       loadInfo();
     }
+
     checkActiveTournament();
 
     const tourSub = supabase.channel(`tour-status-${tournamentId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` },
       (payload) => setStatus(payload.new.status))
       .subscribe();
+    
     const partSub = supabase.channel(`tour-parts-${tournamentId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${tournamentId}` },
       () => fetchParticipants())
       .subscribe();
+    
     const duelSub = supabase.channel(`tour-duels-${tournamentId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
       () => checkForActiveDuel())
       .subscribe();
+    
     return () => {
       supabase.removeChannel(tourSub);
       supabase.removeChannel(partSub);
       supabase.removeChannel(duelSub);
     };
-  }, [tournamentId, user]);
+  }, [tournamentId, user, hasCheckedReconnect]);
+
   async function fetchParticipants() {
     const { data } = await supabase.from('tournament_participants').select('*, profiles(username, mmr)').eq('tournament_id', tournamentId);
     if (data) setParticipants(data);
   }
+
   async function checkForActiveDuel() {
     if (!user) return;
     const { data } = await supabase
@@ -107,6 +122,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       setActiveDuelId(null);
     }
   }
+
   // === РЕЖИМ БОЯ ===
   if (activeDuelId) {
     return (
@@ -119,28 +135,48 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       />
     );
   }
-  // ИСПРАВЛЕНИЕ: Рендер ReconnectModal
+
+  // === ИСПРАВЛЕНИЕ: Модалка реконнекта с localStorage флагом ===
   if (showReconnect) {
     return (
       <ReconnectModal
         onReconnect={() => {
           setShowReconnect(false);
+          
           if (reconnectDuelId) {
-            setActiveDuelId(reconnectDuelId); // Переходим в дуэль
+            // Переходим в активный матч
+            setActiveDuelId(reconnectDuelId);
           } else if (reconnectTournamentId) {
-            // Здесь логика перехода в лобби турнира (например, setTournamentId или редирект)
-            // Предполагаю, что tournamentId передаётся извне; адаптируйте
-            window.location.href = `/?t=${reconnectTournamentId}`; // Или используйте router
+            // ИСПРАВЛЕНИЕ: Используем sessionStorage вместо редиректа
+            sessionStorage.setItem('reconnecting_tournament', reconnectTournamentId);
+            window.location.href = `/?t=${reconnectTournamentId}`;
           }
         }}
-        onCancel={() => {
+        onCancel={async () => {
           setShowReconnect(false);
-          // Опционально: Удалить участие из БД
-          supabase.from('tournament_participants').delete().eq('user_id', user.id);
+          
+          // Удаляем старое участие
+          if (reconnectTournamentId && user) {
+            await supabase
+              .from('tournament_participants')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('tournament_id', reconnectTournamentId);
+          }
+          
+          // Загружаем текущее лобби
+          const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single();
+          if (data) {
+            setTournamentCode(data.code);
+            setStatus(data.status);
+          }
+          fetchParticipants();
+          checkForActiveDuel();
         }}
       />
     );
   }
+
   // === СЕТКА ===
   if (status === 'active' || status === 'finished') {
     return (
@@ -153,13 +189,13 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
         <div className="flex-1 overflow-hidden">
            <TournamentBracket
              tournamentId={tournamentId}
-             // ВАЖНО: Передаем пустую функцию, так как переход делает checkForActiveDuel выше
              onEnterMatch={() => {}}
            />
         </div>
       </div>
     );
   }
+
   // === ЛОББИ ===
   return (
     <div className="flex items-center justify-center h-full p-4">
@@ -179,6 +215,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
             <span className="text-white font-medium animate-pulse">Ожидание организатора...</span>
           </div>
         </div>
+
         <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-800 min-h-[300px]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-slate-400 text-sm uppercase tracking-wider font-bold">Участники ({participants.length})</h3>
@@ -193,6 +230,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
               <Users className="w-5 h-5 text-slate-500" />
             </div>
           </div>
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {participants.map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl border bg-slate-900 border-slate-700">
