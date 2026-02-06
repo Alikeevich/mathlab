@@ -409,7 +409,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
            {initialDuelId ? 'Восстановление связи...' : 'Поиск противника...'}
         </h2>
         <div className="text-slate-400 text-sm max-w-xs text-center">
-          Если соперник не найдется, мы подберем тренировочного бота.
+          Желаем удачной и честной партии!
         </div>
         <button onClick={async () => {
            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
