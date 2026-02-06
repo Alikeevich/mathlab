@@ -7,9 +7,8 @@ import { getPvPRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
-import { useBotOpponent } from '../hooks/useBotOpponent'; // <--- ИМПОРТ ХУКА
+import { useBotOpponent } from '../hooks/useBotOpponent';
 
-// Специальный ID, чтобы отличать бота в базе данных (если понадобится)
 const BOT_UUID = 'c00d4ad6-1ed1-4195-b596-ac6960f3830a';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
@@ -25,45 +24,38 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [status, setStatus] = useState<DuelState>(initialDuelId ? 'searching' : 'lobby');
   const [duelId, setDuelId] = useState<string | null>(initialDuelId || null);
  
-  // Соперник
   const [opponentName, setOpponentName] = useState<string>('???');
   const [opponentMMR, setOpponentMMR] = useState<number>(1000);
   
-  // === БОТ STATE ===
   const [isBotMatch, setIsBotMatch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
  
-  // Данные матча
   const [problems, setProblems] = useState<any[]>([]);
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
   const [oppProgress, setOppProgress] = useState(0);
   
-  // Ввод
   const [userAnswer, setUserAnswer] = useState('');
   const mfRef = useRef<any>(null);
   
-  // Результаты
   const [winner, setWinner] = useState<'me' | 'opponent' | 'draw' | null>(null);
   const [mmrChange, setMmrChange] = useState<number | null>(null);
   
-  // UI стейты
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // === 1. ПОДКЛЮЧЕНИЕ МОЗГОВ БОТА ===
   const myMMR = profile?.mmr || 1000;
   let botDifficulty: 'easy' | 'medium' | 'hard' = 'medium';
   
-  if (myMMR < 800) botDifficulty = 'easy';   // Для новичков бот тупит
-  if (myMMR > 1400) botDifficulty = 'hard';  // Для профи бот потеет
+  if (myMMR < 800) botDifficulty = 'easy';
+  if (myMMR > 1400) botDifficulty = 'hard';
 
   const { botName } = useBotOpponent({
     isEnabled: isBotMatch && status === 'battle',
-    difficulty: botDifficulty, // <--- ПЕРЕДАЕМ ДИНАМИЧЕСКУЮ СЛОЖНОСТЬ
+    difficulty: botDifficulty,
     maxQuestions: problems.length || 10,
     onProgressUpdate: (score, progress) => {
       setOppScore(score);
@@ -74,17 +66,14 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     }
   });
 
-  // Если бот выиграл
   const handleBotWin = async () => {
     if (status === 'finished') return;
-    // Обновляем базу, что мы проиграли
     if (duelId) {
        await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: BOT_UUID });
     }
-    endGame('opponent', -20); // Фиксированный минус за проигрыш боту
+    endGame('opponent', -20);
   };
 
-  // === 2. АВТО-РЕКОННЕКТ ===
   useEffect(() => {
     if (initialDuelId && status === 'searching') {
       reconnectToDuel(initialDuelId);
@@ -100,10 +89,9 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
        return;
     }
     
-    // Проверяем, играем ли мы с ботом
     if (duel.player2_id === BOT_UUID) {
        setIsBotMatch(true);
-       setOpponentName("Bot Player"); // Имя подтянется из хука
+       setOpponentName("Bot Player");
     }
 
     const isP1 = duel.player1_id === user?.id;
@@ -111,13 +99,11 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     
     await loadProblems(duel.problem_ids);
     
-    // Если это человек - грузим инфо, если бот - скипаем
     if (oppId && oppId !== BOT_UUID) await fetchOpponentData(oppId);
    
     setMyScore(isP1 ? duel.player1_score : duel.player2_score);
     setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
     
-    // Если это бот, мы не знаем его старый счет (он сбросится), так что пусть бот начинает заново или с 0
     if (oppId !== BOT_UUID) {
         setOppScore(isP1 ? duel.player2_score : duel.player1_score);
         setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
@@ -127,7 +113,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setStatus('battle');
   }
 
-  // === 3. ПОИСК МАТЧА (С БОТОМ) ===
   async function findMatch() {
     setStatus('searching');
     setIsBotMatch(false);
@@ -135,7 +120,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     const myMMR = profile?.mmr || 1000;
     const range = 300;
     
-    // 1. Пытаемся найти реального человека
     const { data: waitingDuel } = await supabase
         .from('duels')
         .select('*')
@@ -148,7 +132,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
         .maybeSingle();
     
     if (waitingDuel) {
-      // НАШЛИ ЧЕЛОВЕКА
       setDuelId(waitingDuel.id);
       await loadProblems(waitingDuel.problem_ids);
       await fetchOpponentData(waitingDuel.player1_id);
@@ -158,7 +141,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       return;
     } 
 
-    // 2. Если никого нет -> Создаем комнату
     const { data: allProbs } = await supabase.from('problems').select('id').eq('module_id', '00000000-0000-0000-0000-000000000099');
     const shuffled = allProbs?.sort(() => 0.5 - Math.random()).slice(0, 10).map(p => p.id) || [];
     
@@ -170,12 +152,10 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setDuelId(newDuel.id);
     await loadProblems(shuffled);
 
-    // Подписка (вдруг человек зайдет)
     const channel = supabase.channel(`duel-${newDuel.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${newDuel.id}` },
       (payload) => {
          const newData = payload.new;
-         // Если зашел человек
          if (newData.status === 'active' && newData.player2_id && newData.player2_id !== BOT_UUID) {
              if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
              fetchOpponentData(newData.player2_id).then(() => setStatus('battle'));
@@ -183,22 +163,18 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       })
       .subscribe();
 
-    // 3. ЗАПУСКАЕМ ТАЙМЕР БОТА (5 секунд)
     searchTimeoutRef.current = setTimeout(async () => {
         console.log("No human found. Deploying BOT.");
         
         supabase.removeChannel(channel);
         
-        // ГЕНЕРИРУЕМ ФЕЙКОВЫЙ РЕЙТИНГ БОТА
-        // Рейтинг игрока +/- 50 очков. Например: у тебя 1200, у бота будет 1234.
         const fakeBotMMR = (profile?.mmr || 1000) + Math.floor(Math.random() * 100 - 50);
-        setOpponentMMR(fakeBotMMR); // Обновляем в стейте, чтобы показать на экране
+        setOpponentMMR(fakeBotMMR);
 
-        // Обновляем базу
         await supabase.from('duels').update({
             status: 'active',
             player2_id: BOT_UUID,
-            player2_mmr: fakeBotMMR // Записываем в базу фейковый рейтинг
+            player2_mmr: fakeBotMMR
         }).eq('id', newDuel.id);
 
         setIsBotMatch(true);
@@ -207,9 +183,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     }, 5000);
   }
 
-  // Подписка на обновления (Только для PvP с людьми)
   function startBattleSubscription(id: string, myRole: 'player1' | 'player2') {
-    if (isBotMatch) return; // Боту сокеты не нужны
+    if (isBotMatch) return;
 
     supabase.channel(`duel-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
@@ -229,9 +204,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       .subscribe();
   }
 
-  // === 4. ОБРАБОТКА ОТВЕТОВ ===
-  
-  // Клавиатура
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
@@ -254,7 +226,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
-  // Проверка ответа
   async function handleAnswer(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!duelId || feedback || !userAnswer || userAnswer.trim() === '') return;
@@ -269,9 +240,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
    
-    // Обновляем базу (даже с ботом, чтобы сохранить историю)
     if (!isBotMatch) {
-       // Логика с человеком (старая)
        const { data: duel } = await supabase.from('duels').select('player1_id').eq('id', duelId!).single();
        if (duel) {
            const isP1 = duel.player1_id === user!.id;
@@ -295,9 +264,9 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
           
           if (newScore > oppScore) {
-             endGame('me', 25); // Вы набрали больше очков
+             endGame('me', 25);
           } else if (newScore < oppScore) {
-             endGame('opponent', -20); // Бот набрал больше очков
+             endGame('opponent', -20);
           } else {
              endGame('me', 10); 
           }
@@ -315,9 +284,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     }, 1000);
   }
 
-  // === 5. ВСПОМОГАТЕЛЬНЫЕ ЭФФЕКТЫ ===
-
-  // Таймер хода
   useEffect(() => {
     let timer: any;
     if (status === 'battle' && !feedback && currentProbIndex < problems.length) {
@@ -334,9 +300,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
   const handleTimeout = () => submitResult(false);
 
-  // Heartbeat (только для людей)
   useEffect(() => {
-    if (isBotMatch) return; // Бота не проверяем на дисконнект
+    if (isBotMatch) return;
     let interval: any;
     if (status === 'battle' && duelId && user) {
       interval = setInterval(async () => {
@@ -359,7 +324,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     return () => clearInterval(interval);
   }, [status, duelId, user, isBotMatch]);
 
-  // Загрузка
   async function loadProblems(ids: string[]) {
     if (!ids || ids.length === 0) return;
     const { data } = await supabase.from('problems').select('*').in('id', ids);
@@ -368,7 +332,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   }
 
   async function fetchOpponentData(uid: string) {
-    if (uid === BOT_UUID) return; // Это бот
+    if (uid === BOT_UUID) return;
     const { data } = await supabase.from('profiles').select('username, mmr').eq('id', uid).single();
     if (data) {
       setOpponentName(data.username);
@@ -380,7 +344,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     if (status === 'finished') return;
     setStatus('finished');
     
-    // Определяем победителя
     let isWin = false;
     if (isBotMatch) {
         isWin = winnerId === 'me';
@@ -392,7 +355,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setWinner(isWin ? 'me' : 'opponent');
     refreshProfile();
     
-    // Очищаем таймеры
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
   }
 
@@ -400,20 +362,16 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setShowSurrenderModal(false);
     if (duelId && user) {
       await supabase.rpc('surrender_duel', { duel_uuid: duelId, surrendering_uuid: user.id });
-      // Если бот - завершаем сразу вручную
       if (isBotMatch) endGame('opponent', -25);
     }
   };
 
-  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, []);
 
-  // === RENDER ===
-  // Лобби
   if (status === 'lobby') {
     return (
       <div className="flex items-center justify-center h-full">
@@ -443,7 +401,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // Поиск
   if (status === 'searching') {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-6">
@@ -470,7 +427,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // Битва
+  // ============ НОВЫЙ LAYOUT БИТВЫ ============
   if (status === 'battle') {
     return (
       <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
@@ -498,66 +455,76 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-0">
-            {/* ТАБЛО */}
-            <div className="flex items-center justify-between mb-4 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-              <button onClick={() => setShowSurrenderModal(true)} className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
-                <Flag className="w-5 h-5" />
-              </button>
-              
-              <div className="text-right">
-                <div className="text-cyan-400 text-xs font-bold">ВЫ</div>
-                <div className="text-2xl font-black text-white leading-none">{myScore}</div>
-              </div>
-              
-              <div className="flex flex-col items-center px-4">
-                 <div className={`flex items-center gap-1 font-mono font-bold text-xl ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                    <Timer className="w-4 h-4" /> {timeLeft}
-                 </div>
-              </div>
-              
-              <div className="text-left">
-                {/* ЕСЛИ ЭТО БОТ - ПОКАЗЫВАЕМ ИМЯ ИЗ ХУКА */}
-                <div className="text-red-400 text-xs font-bold truncate max-w-[80px]">
-                   {isBotMatch ? botName : opponentName}
-                </div>
-                <div className="text-2xl font-black text-white leading-none">{oppScore}</div>
-              </div>
+        {/* ========== STICKY ВЕРХНЯЯ ЧАСТЬ ========== */}
+        <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
+          
+          {/* ТАБЛО */}
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-800/80 border-b border-slate-700">
+            <button onClick={() => setShowSurrenderModal(true)} className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+              <Flag className="w-4 h-4" />
+            </button>
+            
+            <div className="text-right">
+              <div className="text-cyan-400 text-[10px] font-bold uppercase">ВЫ</div>
+              <div className="text-xl font-black text-white leading-none">{myScore}</div>
             </div>
-
-            <div className="space-y-1.5 mb-4">
-               <div className="h-1 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} /></div>
-               <div className="h-1 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} /></div>
+            
+            <div className="flex flex-col items-center px-3">
+               <div className={`flex items-center gap-1 font-mono font-bold text-lg ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                  <Timer className="w-3.5 h-3.5" /> {timeLeft}
+               </div>
             </div>
+            
+            <div className="text-left">
+              <div className="text-red-400 text-[10px] font-bold truncate max-w-[70px] uppercase">
+                 {isBotMatch ? botName : opponentName}
+              </div>
+              <div className="text-xl font-black text-white leading-none">{oppScore}</div>
+            </div>
+          </div>
 
-            {currentProbIndex < problems.length && problems[currentProbIndex] ? (
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 mb-4 relative overflow-hidden min-h-[120px] flex items-center justify-center text-center">
-                  <h2 className="text-xl md:text-2xl font-bold text-white leading-relaxed">
+          {/* ПРОГРЕССБАРЫ */}
+          <div className="space-y-1 px-3 py-2 bg-slate-900">
+             <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+               <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
+             </div>
+             <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+               <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
+             </div>
+          </div>
+
+          {/* ========== STICKY ЗАДАНИЕ (ВСЕГДА ВИДНО) ========== */}
+          {currentProbIndex < problems.length && problems[currentProbIndex] ? (
+             <div className="px-3 py-3 bg-gradient-to-b from-slate-900 to-slate-900/95">
+                <div className="bg-slate-800/60 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-3 shadow-lg">
+                  <div className="text-base md:text-lg font-bold text-white leading-snug text-center">
                     <Latex>{problems[currentProbIndex].question}</Latex>
-                  </h2>
+                  </div>
+                </div>
+             </div>
+          ) : (
+             <div className="flex items-center justify-center py-4">
+               <div className="text-center animate-pulse text-white text-sm">
+                 <Loader className="w-5 h-5 mx-auto mb-1 animate-spin" />
+                 Ожидание результата...
                </div>
-            ) : (
-               <div className="flex items-center justify-center h-20">
-                 <div className="text-center animate-pulse text-white text-sm">
-                   <Loader className="w-6 h-6 mx-auto mb-2 animate-spin" />
-                   Ожидание результата...
-                 </div>
-               </div>
-            )}
+             </div>
+          )}
         </div>
 
-        <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 z-50">
+        {/* ========== НИЖНЯЯ ЧАСТЬ (КЛАВИАТУРА/ФИДБЕК) ========== */}
+        <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20">
             {feedback ? (
-              <div className={`p-6 flex items-center justify-center gap-4 animate-in zoom-in duration-300 min-h-[300px] ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
+              <div className={`p-4 flex items-center justify-center gap-4 animate-in zoom-in duration-300 min-h-[280px] ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
                   <div className="text-center">
-                    <div className={`text-4xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <div className={`text-3xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
                       {feedback === 'correct' ? 'ВЕРНО!' : 'МИМО!'}
                     </div>
                   </div>
               </div>
             ) : (
               <div className="p-2 pb-safe">
-                 <div className="mb-2 px-1">
+                 <div className="mb-1.5 px-1">
                    <MathInput
                      value={userAnswer}
                      onChange={setUserAnswer}
@@ -578,7 +545,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // Финиш
   if (status === 'finished') {
     return (
       <div className="flex items-center justify-center h-full">
