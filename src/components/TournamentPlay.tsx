@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Zap, Loader, Trophy, XCircle, CheckCircle2, Timer, ArrowLeft, Flag, AlertTriangle, WifiOff } from 'lucide-react';
+import { Loader, Trophy, XCircle, Timer, Flag, AlertTriangle, WifiOff } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
@@ -16,7 +16,6 @@ type Props = {
 export function TournamentPlay({ duelId, onFinished }: Props) {
   const { user } = useAuth();
  
-  // === СОСТОЯНИЯ ===
   const [loading, setLoading] = useState(true);
   const [opponentName, setOpponentName] = useState<string>('Соперник');
  
@@ -24,8 +23,8 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
+  const [oppProgress, setOppProgress] = useState(0);
   
-  // Ввод (MathLive)
   const [userAnswer, setUserAnswer] = useState('');
   const mfRef = useRef<any>(null);
  
@@ -37,7 +36,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
 
-  // === ОБРАБОТЧИКИ КЛАВИАТУРЫ (С ЗАЩИТОЙ ОТ СКРОЛЛА) ===
+  // === ОБРАБОТЧИКИ КЛАВИАТУРЫ ===
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
@@ -69,7 +68,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
-  // === 1. ИНИЦИАЛИЗАЦИЯ И ПОДПИСКА ===
+  // === 1. ИНИЦИАЛИЗАЦИЯ ===
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
     async function initMatch() {
@@ -109,10 +108,12 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       const myProg = isP1 ? duel.player1_progress : duel.player2_progress;
       const myPts = isP1 ? duel.player1_score : duel.player2_score;
       const oppPts = isP1 ? duel.player2_score : duel.player1_score;
+      const oppProg = isP1 ? duel.player2_progress : duel.player1_progress;
      
       setCurrentProbIndex(myProg);
       setMyScore(myPts);
       setOppScore(oppPts);
+      setOppProgress(oppProg);
       setLoading(false);
      
       channel = supabase
@@ -121,7 +122,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         (payload) => {
           const newData = payload.new;
           const newOppScore = isP1 ? newData.player2_score : newData.player1_score;
+          const newOppProg = isP1 ? newData.player2_progress : newData.player1_progress;
           setOppScore(newOppScore);
+          setOppProgress(newOppProg);
           if (newData.status === 'finished') {
             setMatchStatus('finished');
             setWinnerId(newData.winner_id);
@@ -160,7 +163,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     return () => clearInterval(interval);
   }, [matchStatus, duelId, loading, user]);
 
-  // === 3. ОТПРАВКА ОТВЕТА (SECURE) ===
+  // === 3. ОТПРАВКА ОТВЕТА ===
   const submitResult = useCallback(async (isCorrect: boolean) => {
     if (!user || !duelId) return;
     setFeedback(isCorrect ? 'correct' : 'wrong');
@@ -220,7 +223,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
 
-  // Фокус при старте
   useEffect(() => {
     if (!loading && mfRef.current && matchStatus === 'active') {
       setTimeout(() => {
@@ -252,10 +254,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     setProblems(sorted);
   }
 
-  // === РЕНДЕР ===
   if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
 
-  // ЭКРАН ФИНИША
+  // === ЭКРАН ФИНИША ===
   if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
     const isWinner = winnerId === user!.id;
     return (
@@ -292,7 +293,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   const currentProb = problems[currentProbIndex];
   
-  // НОВАЯ ВЕРСТКА С ФИКСИРОВАННЫМ НИЗОМ
+  // ============ НОВЫЙ STICKY LAYOUT (КАК В PVP) ============
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
      
@@ -315,62 +316,80 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       {opponentDisconnected && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
             <WifiOff className="w-4 h-4" />
-            <span>Соперник теряет соединение...</span>
+            <span className="text-xs">Соперник теряет соединение...</span>
           </div>
       )}
 
-      {/* ВЕРХНЯЯ ЧАСТЬ (Скролл) */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-0">
+      {/* ========== STICKY ВЕРХНЯЯ ЧАСТЬ ========== */}
+      <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
+        
+        {/* ТАБЛО */}
+        <div className="flex items-center justify-between px-3 py-2 bg-slate-800/80 border-b border-slate-700">
+          <button onClick={() => setShowSurrenderModal(true)} className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+            <Flag className="w-4 h-4" />
+          </button>
           
-          {/* Табло */}
-          <div className="flex items-center justify-between mb-6 bg-slate-800/80 p-4 rounded-xl border border-slate-700 relative">
-            <button onClick={() => setShowSurrenderModal(true)} className="absolute -top-12 left-0 md:static md:mr-4 text-red-500/50 hover:text-red-500 p-2 rounded-lg">
-              <Flag className="w-5 h-5" />
-            </button>
-            <div className="text-right">
-              <div className="text-cyan-400 font-bold text-lg">ВЫ</div>
-              <div className="text-3xl font-black text-white">{myScore}</div>
-            </div>
-            <div className="flex flex-col items-center">
-                <div className="text-slate-500 font-mono text-xs mb-1">ВРЕМЯ</div>
-                <div className={`flex items-center gap-1 font-mono font-bold text-xl ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                  <Timer className="w-4 h-4" /> {timeLeft}
-                </div>
-            </div>
-            <div className="text-left">
-              <div className="text-red-400 font-bold text-lg">{opponentName}</div>
-              <div className="text-3xl font-black text-white">{oppScore}</div>
-            </div>
+          <div className="text-right">
+            <div className="text-cyan-400 text-[10px] font-bold uppercase">ВЫ</div>
+            <div className="text-xl font-black text-white leading-none">{myScore}</div>
           </div>
+          
+          <div className="flex flex-col items-center px-3">
+             <div className={`flex items-center gap-1 font-mono font-bold text-lg ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                <Timer className="w-3.5 h-3.5" /> {timeLeft}
+             </div>
+          </div>
+          
+          <div className="text-left">
+            <div className="text-red-400 text-[10px] font-bold truncate max-w-[70px] uppercase">
+               {opponentName}
+            </div>
+            <div className="text-xl font-black text-white leading-none">{oppScore}</div>
+          </div>
+        </div>
 
-          {/* Задача */}
-          <div className="flex-1 flex flex-col justify-center">
-            {currentProb && (
-                <div className="bg-slate-800 border border-slate-600 rounded-2xl p-8 shadow-2xl relative overflow-hidden mb-4">
-                    <div className="flex justify-between items-center mb-6">
-                      <div className="text-slate-400 text-sm font-mono">ВОПРОС {currentProbIndex + 1} / {problems.length}</div>
-                    </div>
-                    <h2 className="text-3xl font-bold text-white mb-8 leading-relaxed">
-                      <Latex>{currentProb.question}</Latex>
-                    </h2>
+        {/* ПРОГРЕССБАРЫ */}
+        <div className="space-y-1 px-3 py-2 bg-slate-900">
+           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+             <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
+           </div>
+           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+             <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
+           </div>
+        </div>
+
+        {/* ========== STICKY ЗАДАНИЕ ========== */}
+        {currentProb ? (
+           <div className="px-3 py-3 bg-gradient-to-b from-slate-900 to-slate-900/95">
+              <div className="bg-slate-800/60 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-3 shadow-lg">
+                <div className="text-base md:text-lg font-bold text-white leading-snug text-center">
+                  <Latex>{currentProb.question}</Latex>
                 </div>
-            )}
-          </div>
+              </div>
+           </div>
+        ) : (
+           <div className="flex items-center justify-center py-4">
+             <div className="text-center animate-pulse text-white text-sm">
+               <Loader className="w-5 h-5 mx-auto mb-1 animate-spin" />
+               Загрузка...
+             </div>
+           </div>
+        )}
       </div>
 
-      {/* НИЖНЯЯ ЧАСТЬ (Ввод) */}
-      <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 z-50">
+      {/* ========== НИЖНЯЯ ЧАСТЬ (КЛАВИАТУРА) ========== */}
+      <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20">
         {feedback ? (
-          <div className={`p-6 flex items-center justify-center gap-4 animate-in zoom-in duration-300 min-h-[300px] ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
+          <div className={`p-4 flex items-center justify-center gap-4 animate-in zoom-in duration-300 min-h-[280px] ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
               <div className="text-center">
-                <div className={`text-4xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className={`text-3xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {feedback === 'correct' ? 'ВЕРНО!' : 'МИМО!'}
                 </div>
               </div>
           </div>
         ) : (
           <div className="p-2 pb-safe">
-             <div className="mb-2 px-1">
+             <div className="mb-1.5 px-1">
                 <MathInput
                    value={userAnswer}
                    onChange={setUserAnswer}

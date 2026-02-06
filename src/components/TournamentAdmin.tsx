@@ -10,56 +10,70 @@ import { SpectatorModal } from './SpectatorModal';
 export function TournamentAdmin({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
  
-  // Состояния данных
   const [tournamentId, setTournamentId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string>('');
   const [participants, setParticipants] = useState<any[]>([]);
   const [activeDuels, setActiveDuels] = useState<any[]>([]);
  
-  // Состояния интерфейса
   const [status, setStatus] = useState('waiting');
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [spectatingDuelId, setSpectatingDuelId] = useState<string | null>(null);
-  // === 1. ИНИЦИАЛИЗАЦИЯ ТУРНИРА ===
+
+  // === 1. ИНИЦИАЛИЗАЦИЯ ТУРНИРА (ИСПРАВЛЕНО) ===
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
+    
     async function initTournament() {
       if (!user) return;
       
-      // ИСПРАВЛЕНИЕ: Сначала проверяем, есть ли активный турнир для этого учителя
-      const { data: existingTournament, error: checkError } = await supabase
+      // === ИСПРАВЛЕНИЕ: Безопасная проверка существующих турниров ===
+      const { data: existingTournaments, error: checkError } = await supabase
         .from('tournaments')
         .select('*')
         .eq('created_by', user.id)
-        .in('status', ['waiting', 'active']) // Проверяем waiting или active
+        .in('status', ['waiting', 'active'])
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
       
       if (checkError) {
         console.error('Ошибка проверки турнира:', checkError);
       }
       
-      if (existingTournament) {
-        // Если найден — переподключаемся к нему
+      // ИСПРАВЛЕНИЕ: Используем массив вместо .single()
+      if (existingTournaments && existingTournaments.length > 0) {
+        const existingTournament = existingTournaments[0];
+        
+        // Переподключаемся к существующему
         setTournamentId(existingTournament.id);
         setJoinCode(existingTournament.code);
         setStatus(existingTournament.status);
         fetchParticipants(existingTournament.id);
-        fetchActiveDuels(); // Если статус active
+        
+        if (existingTournament.status === 'active') {
+          fetchActiveDuels(existingTournament.id);
+        }
+        
         // Подписка на участников
         channel = supabase
           .channel('admin-participants')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${existingTournament.id}` },
-          () => { fetchParticipants(existingTournament.id); })
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'tournament_participants', 
+            filter: `tournament_id=eq.${existingTournament.id}` 
+          }, () => { 
+            fetchParticipants(existingTournament.id); 
+          })
           .subscribe();
+        
         return; // Не создаём новый
       }
       
-      // Если нет — очищаем старые и создаём новый (как раньше)
+      // === Если нет активных — очищаем старые и создаём новый ===
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      
       await supabase.from('tournaments').delete()
         .eq('created_by', user.id)
         .eq('status', 'waiting')
@@ -84,42 +98,58 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
         setTournamentId(data.id);
         setJoinCode(code);
        
-        // Подписка на участников (кто заходит в лобби)
+        // Подписка на участников
         channel = supabase
           .channel('admin-participants')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${data.id}` },
-          () => { fetchParticipants(data.id); })
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'tournament_participants', 
+            filter: `tournament_id=eq.${data.id}` 
+          }, () => { 
+            fetchParticipants(data.id); 
+          })
           .subscribe();
       }
     }
+    
     initTournament();
+    
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
   }, [user]);
-  // === 2. ПОДПИСКА НА АКТИВНЫЕ ДУЭЛИ (LIVE) ===
+
+  // === 2. ПОДПИСКА НА АКТИВНЫЕ ДУЭЛИ ===
   useEffect(() => {
     let duelChannel: RealtimeChannel | null = null;
    
-    // Подписываемся только если турнир уже начался
     if (tournamentId && status === 'active') {
-       fetchActiveDuels();
+       fetchActiveDuels(tournamentId);
       
        duelChannel = supabase
         .channel(`admin-duels-${tournamentId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
-        () => fetchActiveDuels())
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'duels', 
+          filter: `tournament_id=eq.${tournamentId}` 
+        }, () => fetchActiveDuels(tournamentId))
         .subscribe();
     }
+    
     return () => {
       if (duelChannel) supabase.removeChannel(duelChannel);
     }
   }, [tournamentId, status]);
-  // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ЗАГРУЗКИ ===
+
+  // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
   async function fetchParticipants(tId: string) {
     const targetId = tId || tournamentId;
     if (!targetId) return;
+    
     setLoading(true);
+    
     const { data, error } = await supabase
       .from('tournament_participants')
       .select('*, profiles(username, mmr, clearance_level)')
@@ -130,10 +160,13 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
     } else if (data) {
       setParticipants(data);
     }
+    
     setLoading(false);
   }
-  async function fetchActiveDuels() {
-    if (!tournamentId) return;
+
+  async function fetchActiveDuels(tId?: string) {
+    const targetId = tId || tournamentId;
+    if (!targetId) return;
    
     const { data, error } = await supabase
       .from('duels')
@@ -142,9 +175,10 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
         p1:profiles!duels_player1_id_fkey(username),
         p2:profiles!duels_player2_id_fkey(username)
       `)
-      .eq('tournament_id', tournamentId)
+      .eq('tournament_id', targetId)
       .eq('status', 'active')
-      .order('round', { ascending: false }); // Свежие раунды сверху
+      .order('round', { ascending: false });
+    
     if (error) {
       console.error("Ошибка загрузки матчей:", error);
       return;
@@ -152,13 +186,16 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
    
     if (data) setActiveDuels(data);
   }
+
   // === 3. ЗАПУСК ТУРНИРА ===
   async function startTournament() {
     if (!tournamentId || participants.length < 2) {
       alert("Нужно минимум 2 участника для старта!");
       return;
     }
+    
     setStarting(true);
+    
     try {
       const { error } = await supabase.rpc('start_tournament_engine', { t_id: tournamentId });
      
@@ -172,6 +209,7 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
       setStarting(false);
     }
   }
+
   // === 4. УДАЛЕНИЕ ТУРНИРА ===
   async function destroyTournament() {
     if (tournamentId) {
@@ -179,25 +217,29 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
       onClose();
     }
   }
+
   const handleCloseAttempt = () => {
     if (status === 'active' || status === 'finished') {
-      // Если турнир идет, просто закрываем админку (сворачиваем), турнир остается в базе
+      // Турнир идет — просто закрываем админку
       onClose();
     } else {
-      // Если еще не начали - спрашиваем подтверждение на удаление
+      // Ещё не начали — спрашиваем подтверждение
       setShowConfirmClose(true);
     }
   };
+
   const joinLink = `${window.location.origin}/?t=${joinCode}`;
+
   return (
     <>
-      {/* МОДАЛКА СПЕКТАТОРА (ПРОСМОТР МАТЧА) */}
+      {/* МОДАЛКА СПЕКТАТОРА */}
       {spectatingDuelId && (
         <SpectatorModal
           duelId={spectatingDuelId}
           onClose={() => setSpectatingDuelId(null)}
         />
       )}
+
       {/* МОДАЛКА ПОДТВЕРЖДЕНИЯ ЗАКРЫТИЯ */}
       {showConfirmClose && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -228,6 +270,7 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       )}
+
       {/* ОСНОВНОЕ ОКНО АДМИНКИ */}
       <div className="fixed inset-0 bg-slate-900 z-[100] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-300">
        
@@ -241,7 +284,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
-             {/* Кнопка "Удалить турнир" */}
              <button
                onClick={() => setShowConfirmClose(true)}
                className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 transition-colors"
@@ -250,7 +292,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                <Trash2 className="w-5 h-5" />
              </button>
             
-             {/* Кнопка "Закрыть окно" */}
              <button
                onClick={handleCloseAttempt}
                className="p-2 hover:bg-slate-700 rounded-full transition-colors"
@@ -259,13 +300,13 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
              </button>
           </div>
         </div>
+
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
          
-          {/* === ЛЕВАЯ КОЛОНКА (Управление / Live Feed) === */}
+          {/* === ЛЕВАЯ КОЛОНКА === */}
           <div className="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-slate-700 flex flex-col bg-slate-800/50 overflow-y-auto shrink-0">
            
             {status === 'waiting' ? (
-               // РЕЖИМ ОЖИДАНИЯ: QR КОД
                <div className="flex flex-col items-center justify-center flex-1 py-10">
                   <div className="bg-white p-4 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.2)] mb-8 transform hover:scale-105 transition-transform duration-300">
                     <QRCode value={joinLink} size={220} />
@@ -294,7 +335,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                   <p className="text-slate-500 text-xs mt-3 text-center">Нужно минимум 2 участника для старта</p>
                </div>
             ) : (
-               // РЕЖИМ БИТВЫ: СПИСОК LIVE МАТЧЕЙ
                <div className="flex flex-col h-full">
                  <div className="flex items-center gap-2 mb-4 text-white font-bold animate-pulse">
                    <div className="w-2 h-2 bg-red-500 rounded-full" />
@@ -308,7 +348,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                        onClick={() => setSpectatingDuelId(duel.id)}
                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 p-4 rounded-xl cursor-pointer transition-all group relative overflow-hidden"
                      >
-                       {/* Фон с градиентом при ховере */}
                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                       
                        <div className="relative z-10">
@@ -337,7 +376,8 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                </div>
             )}
           </div>
-          {/* === ПРАВАЯ КОЛОНКА (СПИСОК ИЛИ СЕТКА) === */}
+
+          {/* === ПРАВАЯ КОЛОНКА === */}
           <div className="flex-1 p-8 bg-slate-900 overflow-y-auto">
            
             {status === 'active' || status === 'finished' ? (
@@ -345,7 +385,7 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                  {tournamentId && (
                    <TournamentBracket
                      tournamentId={tournamentId}
-                     onEnterMatch={() => {}} // Учитель не играет
+                     onEnterMatch={() => {}}
                      isTeacher={true}
                    />
                  )}
@@ -361,7 +401,6 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                   </div>
                  
                   <div className="flex items-center gap-4">
-                     {/* Кнопка ручного обновления */}
                      <button
                        onClick={() => tournamentId && fetchParticipants(tournamentId)}
                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -374,6 +413,7 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
                      </span>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {participants.map((p) => {
                     const username = p.profiles?.username || 'Неизвестный';
