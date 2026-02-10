@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Delete, ArrowLeft, ArrowRight, CornerDownLeft, Space } from 'lucide-react';
 
 type MathKeypadProps = {
@@ -15,54 +15,49 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
   const [longPressKey, setLongPressKey] = useState<string | null>(null);
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const longPressPosition = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggered = useRef(false);
 
-  const preventAll = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
+  // === ОБРАБОТЧИКИ НАЖАТИЙ ===
 
-  const handleSafeClick = (action: () => void) => {
-    return (e: React.MouseEvent | React.TouchEvent) => {
-      preventAll(e);
-      action();
-      const scrollY = window.scrollY;
-      const scrollX = window.scrollX;
-      requestAnimationFrame(() => {
-        window.scrollTo(scrollX, scrollY);
-      });
-    };
-  };
-
-  // === LONG PRESS ОБРАБОТЧИК ===
-  const handleLongPressStart = (key: string, e: React.TouchEvent | React.MouseEvent) => {
-    preventAll(e);
+  const handlePressStart = (key: string, hasMenu: boolean) => {
+    isLongPressTriggered.current = false;
     
-    // Получаем координаты
-    const touch = 'touches' in e ? e.touches[0] : e;
-    longPressPosition.current = { x: touch.clientX, y: touch.clientY };
-    
-    longPressTimer.current = setTimeout(() => {
-      setLongPressKey(key);
-      
-      // Вибрация (если поддерживается)
-      if ('vibrate' in navigator) {
-        navigator.vibrate(50);
-      }
-    }, 500); // 500мс удержание
+    if (hasMenu) {
+      longPressTimer.current = setTimeout(() => {
+        isLongPressTriggered.current = true;
+        setLongPressKey(key);
+        // Вибрация
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+      }, 400); // Чуть уменьшил время для отзывчивости (было 500)
+    }
   };
 
-  const handleLongPressEnd = () => {
+  const handlePressEnd = (e: React.SyntheticEvent, action: () => void) => {
+    e.preventDefault(); // Важно для предотвращения двойных кликов/зума
+
+    // Очищаем таймер долгого нажатия
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    longPressPosition.current = null;
+
+    // Если долгое нажатие НЕ сработало — значит это обычный клик
+    if (!isLongPressTriggered.current) {
+      action();
+    }
+    
+    // Сбрасываем флаг
+    isLongPressTriggered.current = false;
   };
 
-  const handleLongPressCancel = () => {
-    handleLongPressEnd();
-    setLongPressKey(null);
+  const handlePressCancel = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    isLongPressTriggered.current = false;
   };
 
   // Очистка при размонтировании
@@ -138,8 +133,8 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
     'r', 's', 'i', 'j'
   ];
 
-  // === КНОПКА С LONG PRESS ===
-  const LongPressKey = ({ 
+  // === КНОПКА (Универсальная) ===
+  const Key = ({ 
     id, 
     label, 
     onClick, 
@@ -148,31 +143,17 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
     children 
   }: any) => (
     <button
-      onPointerDown={preventAll}
-      onTouchStart={(e) => {
-        preventAll(e);
-        if (hasMenu) handleLongPressStart(id, e);
-      }}
-      onTouchEnd={(e) => {
-        preventAll(e);
-        handleLongPressEnd();
-      }}
-      onTouchMove={(e) => {
-        preventAll(e);
-        // Если палец ушёл далеко — отменяем long press
-        if (longPressPosition.current) {
-          const touch = e.touches[0];
-          const dx = Math.abs(touch.clientX - longPressPosition.current.x);
-          const dy = Math.abs(touch.clientY - longPressPosition.current.y);
-          if (dx > 10 || dy > 10) {
-            handleLongPressCancel();
-          }
-        }
-      }}
-      onClick={handleSafeClick(onClick)}
+      // Используем onPointer события для лучшей поддержки мобилок
+      onPointerDown={() => handlePressStart(id, hasMenu)}
+      onPointerUp={(e) => handlePressEnd(e, onClick)}
+      onPointerLeave={handlePressCancel}
+      onPointerCancel={handlePressCancel}
+      
+      // Отключаем контекстное меню при долгом нажатии
+      onContextMenu={(e) => e.preventDefault()}
+      
       tabIndex={-1} 
-      className={`relative rounded-lg font-bold flex items-center justify-center transition-all active:scale-95 shadow-[0_2px_0_0_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-[2px] ${className} ${hasMenu ? 'ring-1 ring-cyan-500/20' : ''}`}
-      style={{ touchAction: 'none' }}
+      className={`relative rounded-lg font-bold flex items-center justify-center select-none touch-manipulation transition-transform active:scale-95 active:brightness-110 shadow-[0_2px_0_0_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-[2px] ${className} ${hasMenu ? 'ring-1 ring-cyan-500/20' : ''}`}
     >
       {children || label}
       {hasMenu && (
@@ -180,8 +161,6 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       )}
     </button>
   );
-
-  const Key = LongPressKey; // Alias для обычных кнопок
 
   const toggleTab = () => {
     if (activeTab === 'num') setActiveTab('abc');
@@ -201,17 +180,17 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       {longPressKey && longPressMenus[longPressKey] && (
         <div 
           className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-end justify-center pb-safe animate-in fade-in duration-150"
-          onClick={() => setLongPressKey(null)}
+          onPointerUp={() => setLongPressKey(null)}
         >
           <div 
             className="bg-slate-800 border-t-2 border-cyan-500 rounded-t-3xl p-4 w-full max-w-md shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()} // Чтобы клик по меню не закрывал его сразу
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-bold text-lg">Варианты функции</h3>
               <button 
                 onClick={() => setLongPressKey(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white px-2 py-1"
               >
                 ✕
               </button>
@@ -221,10 +200,11 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
               {longPressMenus[longPressKey].map((option, idx) => (
                 <button
                   key={idx}
-                  onClick={handleSafeClick(() => {
+                  onPointerUp={(e) => {
+                    e.preventDefault();
                     onCommand(option.cmd, option.arg);
                     setLongPressKey(null);
-                  })}
+                  }}
                   className="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white py-4 px-3 rounded-xl font-bold text-sm transition-all active:scale-95"
                 >
                   {option.label}
@@ -236,7 +216,7 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       )}
 
       {/* === ОСНОВНАЯ КЛАВИАТУРА === */}
-      <div className="flex flex-col gap-1.5 select-none pb-1" style={{ touchAction: 'none' }}>
+      <div className="flex flex-col gap-1.5 select-none pb-1 touch-none">
         
         {/* ВЕРХНЯЯ ПАНЕЛЬ */}
         <div className="grid grid-cols-4 gap-1.5">
@@ -263,38 +243,38 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                <>
                  {/* ТРИГОНОМЕТРИЯ С LONG PRESS */}
                  <div className="grid grid-cols-4 gap-1.5">
-                    <LongPressKey 
+                    <Key 
                       id="sin"
                       hasMenu={true}
                       onClick={() => onCommand('insert', '\\sin(#?)')} 
                       className="bg-slate-700 text-cyan-300 text-xs py-2"
                     >
                       sin
-                    </LongPressKey>
-                    <LongPressKey 
+                    </Key>
+                    <Key 
                       id="cos"
                       hasMenu={true}
                       onClick={() => onCommand('insert', '\\cos(#?)')} 
                       className="bg-slate-700 text-cyan-300 text-xs py-2"
                     >
                       cos
-                    </LongPressKey>
-                    <LongPressKey 
+                    </Key>
+                    <Key 
                       id="tan"
                       hasMenu={true}
                       onClick={() => onCommand('insert', '\\tan(#?)')} 
                       className="bg-slate-700 text-cyan-300 text-xs py-2"
                     >
                       tan
-                    </LongPressKey>
-                    <LongPressKey 
+                    </Key>
+                    <Key 
                       id="cot"
                       hasMenu={true}
                       onClick={() => onCommand('insert', '\\cot(#?)')} 
                       className="bg-slate-700 text-cyan-300 text-xs py-2"
                     >
                       cot
-                    </LongPressKey>
+                    </Key>
                  </div>
                  
                  {/* ЦИФРЫ */}
@@ -369,14 +349,14 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                     ))}
                     
                     {/* ФУНКЦИИ С LONG PRESS */}
-                    <LongPressKey 
+                    <Key 
                       id="sqrt"
                       hasMenu={true}
                       onClick={() => onCommand('insert', '\\sqrt{#?}')} 
                       className="bg-slate-700 text-cyan-300 py-2.5"
                     >
                       √
-                    </LongPressKey>
+                    </Key>
                     <Key onClick={() => onCommand('insert', '#@^{#?}')} className="bg-slate-700 text-cyan-300 py-2.5 text-sm">
                       xⁿ
                     </Key>
@@ -414,14 +394,14 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
 
         {/* НИЖНЯЯ ПАНЕЛЬ */}
         <div className="grid grid-cols-4 gap-1.5">
-           <LongPressKey 
+           <Key 
              id="log"
              hasMenu={true}
              onClick={() => onCommand('insert', '\\log_{#?}(#@)')} 
              className="bg-slate-700 text-cyan-300 text-xs font-bold py-2"
            >
              log
-           </LongPressKey>
+           </Key>
            <Key 
              onClick={() => onCommand('insert', '\\,')} 
              className="col-span-2 bg-slate-600 text-slate-300 border-b-4 border-slate-800 active:border-b-0 active:translate-y-[4px] py-2"
