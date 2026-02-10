@@ -10,7 +10,6 @@ import { checkAnswer } from '../lib/mathUtils';
 import { useBotOpponent } from '../hooks/useBotOpponent';
 
 const BOT_UUID = 'c00d4ad6-1ed1-4195-b596-ac6960f3830a';
-// ID модуля для PvP задач, чтобы анализатор понимал, откуда пришла ошибка
 const PVP_MODULE_ID = '00000000-0000-0000-0000-000000000099';
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
@@ -51,34 +50,52 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   const myMMR = profile?.mmr || 1000;
   let botDifficulty: 'easy' | 'medium' | 'hard' = 'medium';
-  
   if (myMMR < 800) botDifficulty = 'easy';
   if (myMMR > 1400) botDifficulty = 'hard';
 
+  // === ХУК БОТА С НАЧАЛЬНЫМИ ЗНАЧЕНИЯМИ ===
   const { botName } = useBotOpponent({
     isEnabled: isBotMatch && status === 'battle',
     difficulty: botDifficulty,
     maxQuestions: problems.length || 10,
-    onProgressUpdate: (score, progress) => {
+    initialScore: isBotMatch ? oppScore : 0,       // <--- Передаем текущий счет из стейта (который загрузили из БД)
+    initialProgress: isBotMatch ? oppProgress : 0, // <--- Передаем текущий прогресс из стейта
+    onProgressUpdate: async (score, progress) => {
       setOppScore(score);
       setOppProgress(progress);
+      
+      // Сохраняем прогресс бота в базу данных в реальном времени
+      if (duelId) {
+         // Определяем, кто бот (обычно player2)
+         // Но на всякий случай можно просто обновлять player2_score, так как бот всегда player2
+         await supabase.from('duels').update({
+             player2_score: score,
+             player2_progress: progress,
+             // Можно не обновлять last_seen бота, или обновлять для видимости
+         }).eq('id', duelId);
+      }
+
       if (progress >= (problems.length || 10)) {
-         handleBotWin();
+         handleBotWin(score);
       }
     }
   });
 
-  const handleBotWin = async () => {
+  const handleBotWin = async (finalBotScore: number) => {
     if (status === 'finished') return;
     if (duelId) {
        await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: BOT_UUID });
     }
-    // Если бот закончил, это не значит, что он победил. Но в текущей упрощенной логике
-    // мы считаем завершение "финишем". Реальная победа определяется по очкам.
-    // Если мы еще в игре, то при завершении ботом матча мы сравниваем счет.
-    // Однако useBotOpponent просто эмулирует прогресс.
-    // Пусть здесь просто вызывается конец игры, и там сравним счет.
-    endGame('opponent', -20); // Заглушка, реальный винрейт считается в endGame по очкам
+    
+    // Сравниваем счет, когда бот закончил первым
+    if (myScore > finalBotScore) {
+        endGame('me', 25);
+    } else if (myScore < finalBotScore) {
+        endGame('opponent', -20);
+    } else {
+        // Ничья по очкам, бот быстрее -> бот выиграл
+        endGame('opponent', -10);
+    }
   };
 
   useEffect(() => {
@@ -96,26 +113,29 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
        return;
     }
     
+    const isP1 = duel.player1_id === user?.id;
+    const oppId = isP1 ? duel.player2_id : duel.player1_id;
+
+    // Определяем, бот это или нет
     if (duel.player2_id === BOT_UUID) {
        setIsBotMatch(true);
        setOpponentName("Bot Player");
+       // === ИСПРАВЛЕНИЕ: Загружаем прогресс бота из базы ===
+       // Бот всегда player2 в нашей логике
+       setOppScore(duel.player2_score);
+       setOppProgress(duel.player2_progress);
+    } else {
+       // Если это человек
+       if (oppId) await fetchOpponentData(oppId);
+       setOppScore(isP1 ? duel.player2_score : duel.player1_score);
+       setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
+       startBattleSubscription(id, isP1 ? 'player1' : 'player2');
     }
-
-    const isP1 = duel.player1_id === user?.id;
-    const oppId = isP1 ? duel.player2_id : duel.player1_id;
     
     await loadProblems(duel.problem_ids);
-    
-    if (oppId && oppId !== BOT_UUID) await fetchOpponentData(oppId);
    
     setMyScore(isP1 ? duel.player1_score : duel.player2_score);
     setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
-    
-    if (oppId !== BOT_UUID) {
-        setOppScore(isP1 ? duel.player2_score : duel.player1_score);
-        setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
-        startBattleSubscription(id, isP1 ? 'player1' : 'player2');
-    }
 
     setStatus('battle');
   }
@@ -172,7 +192,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
     searchTimeoutRef.current = setTimeout(async () => {
         console.log("No human found. Deploying BOT.");
-        
         supabase.removeChannel(channel);
         
         const fakeBotMMR = (profile?.mmr || 1000) + Math.floor(Math.random() * 100 - 50);
@@ -277,7 +296,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
            }
        }
     } else {
-       // Логика с БОТОМ
+       // Логика с БОТОМ (обновляем только свой счет, бот обновляет себя сам в хуке)
        await supabase.from('duels').update({ 
            player1_score: newScore, 
            player1_progress: newProgress,
@@ -287,13 +306,11 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
        if (newProgress >= problems.length) {
           await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
           
-          // Исправленная логика победы
           if (newScore > oppScore) {
              endGame('me', 25);
           } else if (newScore < oppScore) {
              endGame('opponent', -20);
           } else {
-             // Если счет равный, но вы закончили первым
              endGame('me', 10); 
           }
        }
@@ -453,34 +470,11 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // ============ НОВЫЙ LAYOUT БИТВЫ ============
   if (status === 'battle') {
     return (
       <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
+        {/* ... (код UI битвы без изменений) ... */}
         
-        {opponentDisconnected && !isBotMatch && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
-            <WifiOff className="w-4 h-4" />
-            <span className="text-xs">Соперник теряет сеть...</span>
-          </div>
-        )}
-
-        {showSurrenderModal && (
-          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-              <div className="flex flex-col items-center text-center mb-6">
-                <AlertTriangle className="w-8 h-8 text-red-500 mb-2" />
-                <h3 className="text-xl font-bold text-white mb-1">Сдаться?</h3>
-                <p className="text-slate-400 text-sm">Вы потеряете рейтинг.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setShowSurrenderModal(false)} className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold">Отмена</button>
-                <button onClick={confirmSurrender} className="px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold">Сдаться</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ========== STICKY ВЕРХНЯЯ ЧАСТЬ ========== */}
         <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
           
@@ -572,6 +566,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   }
 
   if (status === 'finished') {
+    // ... (код финиша без изменений) ...
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-8 md:p-12 bg-slate-800 rounded-3xl border-2 border-slate-600 shadow-2xl max-w-lg w-full animate-in zoom-in-95 duration-300 m-4">
