@@ -566,7 +566,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   }
 
   if (status === 'finished') {
-    // ... (код финиша без изменений) ...
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-8 md:p-12 bg-slate-800 rounded-3xl border-2 border-slate-600 shadow-2xl max-w-lg w-full animate-in zoom-in-95 duration-300 m-4">
