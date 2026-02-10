@@ -8,7 +8,7 @@ import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
 // ИКОНКИ
-import { Crown, Settings, Shield, Zap, Keyboard, Lock, Brain } from 'lucide-react';
+import { Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -330,8 +330,6 @@ function MainApp() {
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
-              
-              {/* НИЖНЯЯ ПАНЕЛЬ С КНОПКАМИ */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 {user ? (
                   <>
@@ -345,11 +343,11 @@ function MainApp() {
 
                     <button
                       onClick={() => setView('analyzer')}
-                      className="flex-1 bg-slate-800/90 backdrop-blur-md border-2 border-purple-500/50 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                      className="flex-1 bg-slate-800/90 backdrop-blur-md border-2 border-amber-500/50 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 group"
                     >
-                      <Brain className="w-5 h-5 text-purple-400 group-hover:text-purple-300 transition-colors" />
-                      <span className="font-bold text-purple-300 text-xs uppercase hidden sm:inline tracking-wider">
-                        Ошибки
+                      <ClipboardList className="w-5 h-5 text-amber-400 group-hover:text-amber-300 transition-colors" />
+                      <span className="font-bold text-amber-300 text-xs uppercase hidden sm:inline tracking-wider">
+                        Журнал
                       </span>
                     </button>
 
