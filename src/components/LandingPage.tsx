@@ -1,5 +1,5 @@
-import { useState } from 'react'; // Добавили useState
-import { ArrowRight, Zap, Shield, Trophy, Mail, Check } from 'lucide-react'; // Добавили Check
+import { useState } from 'react';
+import { ArrowRight, Zap, Shield, Trophy, Mail, Check, CreditCard } from 'lucide-react'; // Добавил CreditCard
 import Squares from './Squares';
 
 type Props = {
@@ -114,6 +114,11 @@ export function LandingPage({ onStartDemo, onLogin, onOpenLegal }: Props) {
                 <button onClick={() => onOpenLegal('terms')} className="hover:text-amber-400 transition-colors underline decoration-slate-700 underline-offset-4">
                   Terms & Conditions
                 </button>
+                
+                {/* ССЫЛКА НА ЦЕНЫ (ДЛЯ PADDLE) */}
+                <a href="/pricing" className="hover:text-purple-400 transition-colors flex items-center gap-1 underline decoration-slate-700 underline-offset-4">
+                  <CreditCard className="w-3 h-3" /> Pricing
+                </a>
               </div>
             </div>
             
