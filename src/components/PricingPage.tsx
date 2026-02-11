@@ -79,7 +79,7 @@ export function PricingPage() {
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg shadow-orange-900/20">
-              <Brain className="w-8 h-8 text-white" />
+
             </div>
             <div>
               <h1 className="text-3xl font-black text-white uppercase tracking-wider">Тарифы</h1>
