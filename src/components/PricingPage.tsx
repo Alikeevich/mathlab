@@ -1,7 +1,72 @@
-import React from 'react';
-import { ArrowLeft, Check, Zap, GraduationCap, Brain, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Zap, GraduationCap, X, Lock, Loader, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { BecomeTeacherModal } from './BecomeTeacherModal';
 
 export function PricingPage() {
+  const { user, profile, refreshProfile } = useAuth();
+  
+  // Состояния для тарифа Teacher
+  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+
+  useEffect(() => {
+    async function checkStatus() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('teacher_requests')
+        .select('status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+        
+      if (data) setRequestStatus(data.status as any);
+      setLoading(false);
+    }
+    checkStatus();
+  }, [user]);
+
+  // Симуляция оплаты и выдача роли
+  const handleTeacherPurchase = async () => {
+    if (!user) return;
+    setProcessingPayment(true);
+
+    try {
+      // Здесь была бы интеграция с Paddle/Stripe
+      await new Promise(r => setTimeout(r, 1500)); // Имитация задержки
+
+      // Обновляем роль
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'teacher' })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      alert("Оплата прошла успешно! Вам присвоен статус Учителя.");
+      window.location.href = "/"; // Редирект в дэшборд
+
+    } catch (e) {
+      console.error(e);
+      alert("Ошибка при обработке платежа.");
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handlePremiumPurchase = async () => {
+    alert("Скоро подключим платежку для Premium!");
+  };
+
   const plans = [
     {
       name: 'Cadet',
@@ -20,7 +85,8 @@ export function PricingPage() {
         'Создание турниров'
       ],
       color: 'slate',
-      btnText: 'Начать бесплатно',
+      icon: <Zap className="w-4 h-4" />,
+      action: <button className="w-full py-4 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-default">Текущий план</button>,
       highlight: false
     },
     {
@@ -40,7 +106,15 @@ export function PricingPage() {
         'Добавление своих задач'
       ],
       color: 'amber',
-      btnText: 'Купить Premium',
+      icon: <Zap className="w-4 h-4" />,
+      action: (
+        <button 
+          onClick={handlePremiumPurchase}
+          className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 shadow-lg shadow-orange-900/30 transition-all active:scale-95"
+        >
+          Купить Premium
+        </button>
+      ),
       highlight: true
     },
     {
@@ -57,8 +131,39 @@ export function PricingPage() {
       ],
       notIncluded: [],
       color: 'cyan',
-      btnText: 'Стать ментором',
-      highlight: false
+      icon: <GraduationCap className="w-4 h-4" />,
+      highlight: false,
+      // Особая логика кнопки для учителя
+      action: (() => {
+        if (profile?.role === 'teacher' || profile?.role === 'admin') {
+          return <button className="w-full py-4 rounded-xl font-bold bg-cyan-900/20 text-cyan-400 border border-cyan-500/30 cursor-default flex items-center justify-center gap-2"><Check className="w-4 h-4"/> Активен</button>;
+        }
+        
+        if (loading) return <div className="py-4 text-center"><Loader className="w-5 h-5 animate-spin mx-auto text-slate-500"/></div>;
+
+        if (requestStatus === 'approved') {
+          return (
+            <button 
+              onClick={handleTeacherPurchase}
+              disabled={processingPayment}
+              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {processingPayment ? <Loader className="w-4 h-4 animate-spin"/> : <ShieldCheck className="w-4 h-4"/>}
+              {processingPayment ? 'Обработка...' : 'Купить доступ'}
+            </button>
+          );
+        }
+
+        return (
+          <button 
+            onClick={() => setShowVerificationModal(true)}
+            className="w-full py-4 rounded-xl font-bold text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-all flex items-center justify-center gap-2 group"
+          >
+            <Lock className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
+            {requestStatus === 'pending' ? 'Заявка на проверке' : 'Пройти верификацию'}
+          </button>
+        );
+      })()
     }
   ];
 
@@ -76,8 +181,6 @@ export function PricingPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg shadow-orange-900/20">
-            </div>
             <div>
               <h1 className="text-3xl font-black text-white uppercase tracking-wider">Тарифы</h1>
               <p className="text-slate-400 text-sm">Инвестируй в свои знания</p>
@@ -139,16 +242,16 @@ export function PricingPage() {
                 ))}
               </div>
 
-              <button 
-                className={`w-full py-4 rounded-xl font-bold text-white transition-all shadow-lg active:scale-95 ${
-                  plan.highlight 
-                    ? `bg-gradient-to-r from-${plan.color}-500 to-orange-600 hover:brightness-110 shadow-orange-900/30` 
-                    : 'bg-slate-700 hover:bg-slate-600'
-                }`}
-                onClick={() => alert('Платежная система подключается. Пожалуйста, напишите на support@mathlabpvp.org')}
-              >
-                {plan.btnText}
-              </button>
+              {/* Кнопка действия */}
+              {plan.action}
+              
+              {/* Подсказка для учителя */}
+              {plan.name === 'Teacher' && requestStatus === 'none' && (
+                <p className="text-[10px] text-center mt-3 text-slate-500">Требуется подтверждение документов</p>
+              )}
+              {plan.name === 'Teacher' && requestStatus === 'approved' && profile?.role !== 'teacher' && (
+                <p className="text-[10px] text-center mt-3 text-emerald-400 font-bold">Верификация пройдена! Оплатите для доступа.</p>
+              )}
             </div>
           ))}
         </div>
@@ -165,6 +268,17 @@ export function PricingPage() {
         </div>
 
       </div>
+
+      {showVerificationModal && (
+        <BecomeTeacherModal onClose={() => {
+          setShowVerificationModal(false);
+          // Перезагрузим статус
+          supabase.from('teacher_requests').select('status').eq('user_id', user!.id).maybeSingle().then(({data}) => {
+             if(data) setRequestStatus(data.status as any);
+             else setRequestStatus('pending'); // Оптимистично
+          });
+        }} />
+      )}
     </div>
   );
 }
