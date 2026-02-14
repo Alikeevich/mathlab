@@ -93,35 +93,56 @@ export function AdminDashboard({ onClose }: Props) {
   }
 
   // Обработка заявки (Принять/Отклонить)
+// Обработка заявки (Принять/Отклонить)
   async function handleRequestAction(req: TeacherRequest, action: 'approve' | 'reject') {
-    if (!confirm(action === 'approve' ? 'Одобрить заявку?' : 'Отклонить заявку?')) return;
+    if (!confirm(action === 'approve' ? 'Одобрить заявку и выдать права учителя?' : 'Отклонить заявку?')) return;
 
     try {
-      // 1. Обновляем статус заявки
-      const { error } = await supabase
+      setLoading(true); // Включаем лоадер, чтобы не нажали дважды
+
+      // 1. Обновляем статус заявки в teacher_requests
+      const { error: reqError } = await supabase
         .from('teacher_requests')
         .update({ status: action === 'approve' ? 'approved' : 'rejected' })
         .eq('id', req.id);
 
-      if (error) throw error;
+      if (reqError) throw new Error(`Ошибка обновления заявки: ${reqError.message}`);
 
-      // 2. Отправляем уведомление пользователю
+      // 2. ЕСЛИ ОДОБРЕНО: Обновляем роль пользователя в profiles
+      if (action === 'approve') {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ role: 'teacher' })
+          .eq('id', req.user_id);
+
+        if (profileError) throw new Error(`Ошибка выдачи роли: ${profileError.message}`);
+      }
+
+      // 3. Отправляем уведомление пользователю
       await supabase.from('notifications').insert({
         user_id: req.user_id,
         title: action === 'approve' ? 'Заявка одобрена!' : 'Заявка отклонена',
         message: action === 'approve' 
-          ? 'Ваши документы проверены. Теперь вы можете оплатить тариф Teacher в панели управления.' 
-          : 'К сожалению, мы не смогли подтвердить ваш статус учителя. Проверьте документы и попробуйте снова.',
+          ? 'Поздравляем! Вам присвоен статус Учителя. Вам доступны создание турниров и панель управления.' 
+          : 'К сожалению, мы не смогли подтвердить ваш статус учителя по предоставленным документам.',
         type: action === 'approve' ? 'success' : 'error'
       });
 
-      // Убираем из списка
+      // 4. Обновляем UI локально (убираем из списка)
       setRequests(prev => prev.filter(r => r.id !== req.id));
-      alert(action === 'approve' ? 'Заявка одобрена' : 'Заявка отклонена');
+      
+      // Если мы находимся во вкладке пользователей, обновим и её, чтобы увидеть новую роль
+      if (activeTab === 'users') {
+         fetchUsers();
+      }
 
-    } catch (e) {
-      console.error(e);
-      alert('Ошибка обработки заявки');
+      alert(action === 'approve' ? 'Учитель успешно утвержден!' : 'Заявка отклонена.');
+
+    } catch (e: any) {
+      console.error('CRITICAL ERROR:', e);
+      alert(e.message || 'Произошла ошибка при обработке.');
+    } finally {
+      setLoading(false);
     }
   }
 
