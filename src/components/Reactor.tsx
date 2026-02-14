@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
 import { checkAnswer } from '../lib/mathUtils';
+import { grantXp } from '../lib/xpSystem'; // <--- Импорт системы опыта
 import 'katex/dist/katex.min.css';
 import {
   ArrowLeft,
@@ -33,11 +34,11 @@ type ReactorProps = {
   module: Module;
   onBack: () => void;
   onRequestAuth?: () => void;
-  forcedProblemIds?: string[] | null; // <--- НОВЫЙ ПРОП: Список конкретных задач
+  forcedProblemIds?: string[] | null;
 };
 
 export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: ReactorProps) {
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth(); // Берем profile для проверки премиума
   
   const [problems, setProblems] = useState<Problem[]>([]);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
@@ -52,6 +53,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
   const [startTime, setStartTime] = useState(Date.now());
   const [problemsSolved, setProblemsSolved] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  const [xpGained, setXpGained] = useState<number | null>(null); // Для отображения полученного опыта
 
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
@@ -63,18 +65,15 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
       try {
         let query = supabase.from('problems').select('*');
 
-        // ЕСЛИ ПЕРЕДАН СПИСОК ID (РЕЖИМ РАБОТЫ НАД ОШИБКАМИ)
         if (forcedProblemIds && forcedProblemIds.length > 0) {
           query = query.in('id', forcedProblemIds);
         } else {
-          // ОБЫЧНЫЙ РЕЖИМ (ПО МОДУЛЮ)
           query = query.eq('module_id', module.id);
         }
 
         const { data } = await query;
 
         if (data && data.length > 0) {
-          // Перемешиваем
           const shuffled = data.sort(() => 0.5 - Math.random());
           setProblems(shuffled);
           setCurrentProblem(shuffled[0]);
@@ -88,16 +87,12 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
 
   // === 2. СМЕНА ЗАДАЧИ ===
   function loadNextProblem() {
+    setXpGained(null); // Сбрасываем отображение опыта
     if (!user && problemsSolved >= GUEST_LIMIT) {
       setShowPaywall(true);
       return;
     }
     
-    // Если это режим работы над ошибками, мы не должны повторять задачи бесконечно,
-    // но в рамках простой реализации оставим рандом из загруженного списка.
-    // Или можно удалять решенную задачу из стейта.
-    
-    // Вариант: Удаляем текущую задачу из списка, если решили правильно (для режима ошибок)
     let nextProblems = [...problems];
     if (forcedProblemIds && result === 'correct' && currentProblem) {
        nextProblems = problems.filter(p => p.id !== currentProblem.id);
@@ -105,11 +100,11 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     }
 
     if (nextProblems.length === 0) {
-       // Если задачи кончились
        setCurrentProblem(null);
        return;
     }
     
+    // Берем следующую (рандомную) задачу
     const randomProblem = nextProblems[Math.floor(Math.random() * nextProblems.length)];
     
     setCurrentProblem(randomProblem);
@@ -117,7 +112,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     setShowHint(false);
     setStartTime(Date.now());
     
-    // Очистка
     setUserAnswer('');
     if (mfRef.current) {
       mfRef.current.setValue('');
@@ -129,44 +123,26 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
 
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
-    
     const scrollY = window.scrollY;
     const scrollX = window.scrollX;
-    
-    if (cmd === 'insert') {
-      mfRef.current.executeCommand(['insert', arg]);
-    } else if (cmd === 'perform') {
-      mfRef.current.executeCommand([arg]);
-    }
-    
-    requestAnimationFrame(() => {
-      window.scrollTo(scrollX, scrollY);
-    });
+    if (cmd === 'insert') mfRef.current.executeCommand(['insert', arg]);
+    else if (cmd === 'perform') mfRef.current.executeCommand([arg]);
+    requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
   };
   
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
-    const scrollX = window.scrollX;
-    
     mfRef.current.executeCommand(['deleteBackward']);
-    
-    requestAnimationFrame(() => {
-      window.scrollTo(scrollX, scrollY);
-    });
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
   
   const handleKeypadClear = () => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
-    const scrollX = window.scrollX;
-    
     mfRef.current.setValue('');
     setUserAnswer('');
-    
-    requestAnimationFrame(() => {
-      window.scrollTo(scrollX, scrollY);
-    });
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
   // === 4. ОТПРАВКА ===
@@ -182,10 +158,10 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     if (isCorrect) setCorrectCount(prev => prev + 1);
 
     if (user) {
-      // 1. Сохраняем попытку в experiments (статистика)
+      // 1. Статистика
       await supabase.from('experiments').insert({
         user_id: user.id, 
-        module_id: module.id, // В режиме ошибок module.id будет ID виртуального модуля
+        module_id: module.id, 
         problem_id: currentProblem.id, 
         problem_type: currentProblem.type, 
         correct: isCorrect, 
@@ -193,8 +169,12 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
       });
 
       if (isCorrect) {
-        // === ЛОГИКА ИСПРАВЛЕНИЯ ОШИБКИ ===
-        // Если это режим тренировки ошибок (forcedProblemIds задан), удаляем ошибку из базы
+        // === ЛОГИКА ОПЫТА (PREMIUM x2) ===
+        // Базовый опыт за задачу = 10
+        const xpResult = await grantXp(user.id, profile?.is_premium || false, 10);
+        if (xpResult) setXpGained(xpResult.gained);
+
+        // === ИСПРАВЛЕНИЕ ОШИБКИ ===
         if (forcedProblemIds) {
            await supabase.from('user_errors')
              .delete()
@@ -204,7 +184,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
 
         setTimeout(() => refreshProfile(), 100);
         
-        // Обновляем прогресс только в обычном режиме (не в режиме ошибок)
+        // Прогресс модуля (только в обычном режиме)
         if (!forcedProblemIds) {
             const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
             const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
@@ -216,7 +196,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
             }
         }
       } else {
-        // Если НЕВЕРНО, и это НЕ режим исправления ошибок -> добавляем в ошибки
+        // ОШИБКА -> В БАЗУ
         if (!forcedProblemIds) {
             await supabase.from('user_errors').insert({
               user_id: user.id,
@@ -370,6 +350,13 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                   <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
                     {result === 'correct' ? 'Абсолютно верно!' : 'Ошибка в расчетах'}
                   </div>
+                  {/* ПОКАЗ XP */}
+                  {result === 'correct' && xpGained && (
+                     <div className="text-amber-400 font-bold text-sm mt-1 animate-pulse">
+                        +{xpGained} XP {profile?.is_premium ? '(x2 Premium)' : ''}
+                     </div>
+                  )}
+                  
                   {result === 'incorrect' && (
                     <div className="text-slate-300 text-sm mt-1">
                       Правильный ответ: <span className="font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded"><Latex>{`$${currentProblem.answer}$`}</Latex></span>
@@ -380,15 +367,11 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
             )}
           </div>
         ) : (
-          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl animate-in fade-in duration-300">
+          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl">
              <div className="inline-block p-4 bg-slate-800 rounded-full mb-4">
                <Zap className="w-10 h-10 text-slate-600" />
              </div>
-             <h3 className="text-xl font-bold text-white mb-2">Сессия завершена</h3>
-             <p>Задачи закончились.</p>
-             <button onClick={onBack} className="mt-6 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold">
-               Вернуться
-             </button>
+             <p>Задачи в этом модуле закончились</p>
           </div>
         )}
       </div>
