@@ -24,10 +24,13 @@ import { grantXp } from '../lib/xpSystem';
 import { recordCalibrationMatch } from '../lib/CalibrationSystem';
 import { PvPRank } from '../lib/PvPRankSystem';
 import { RankUpModal } from './RankUpModal';
+import { RankLegendModal } from './RankLegendModal';
+
 
 const BOT_UUID = 'c00d4ad6-1ed1-4195-b596-ac6960f3830a';
 const PVP_MODULE_ID = '00000000-0000-0000-0000-000000000099';
 const BASE_MMR = 700;
+
 
 type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
 
@@ -71,6 +74,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showRankLegend, setShowRankLegend] = useState(false);
+
 
   // Rank Reveal (Calibration finish)
   const [showRevealModal, setShowRevealModal] = useState(false);
