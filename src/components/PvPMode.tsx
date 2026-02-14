@@ -9,6 +9,8 @@ import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
 import { useBotOpponent, getDeterministicBotName } from '../hooks/useBotOpponent';
 import { grantXp } from '../lib/xpSystem'; // <--- ИМПОРТ СИСТЕМЫ ОПЫТА
+import { recordCalibrationMatch } from '../lib/CalibrationSystem';
+
 
 const BOT_UUID = 'c00d4ad6-1ed1-4195-b596-ac6960f3830a';
 const PVP_MODULE_ID = '00000000-0000-0000-0000-000000000099';
