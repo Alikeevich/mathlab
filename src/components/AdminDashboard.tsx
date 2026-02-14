@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   X, Users, Megaphone, Search, Shield, GraduationCap, 
   User as UserIcon, Send, CheckCircle, ChevronDown, 
-  FileText, Check, XCircle, Download, Loader 
+  FileText, Check, XCircle, Download, Loader, Mail // <--- ДОБАВИЛ MAIL СЮДА
 } from 'lucide-react';
 
 type Props = {
@@ -105,11 +105,7 @@ export function AdminDashboard({ onClose }: Props) {
 
       if (error) throw error;
 
-      // 2. Если одобрили -> НЕ меняем роль сразу, так как учитель должен еще оплатить!
-      // Роль сменится либо после оплаты, либо вручную админом.
-      // Но статус заявки 'approved' позволит пользователю увидеть кнопку оплаты.
-
-      // 3. Отправляем уведомление пользователю
+      // 2. Отправляем уведомление пользователю
       await supabase.from('notifications').insert({
         user_id: req.user_id,
         title: action === 'approve' ? 'Заявка одобрена!' : 'Заявка отклонена',
@@ -209,7 +205,6 @@ export function AdminDashboard({ onClose }: Props) {
             className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-2 md:py-3 rounded-xl transition-all font-bold text-sm md:text-base whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
           >
             <GraduationCap className="w-4 h-4 md:w-5 md:h-5" /> Заявки
-            {/* Индикатор новых заявок можно добавить, если сделать запрос count при загрузке */}
           </button>
 
           <button 
