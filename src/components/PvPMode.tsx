@@ -468,7 +468,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full">
               <div className="text-center mb-6">
                 <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                <h3 className="text-xl font-bold text-white">Сдаться?</h3>
+                <h3 className="text-xl font-bold text-white mb-1">Сдаться?</h3>
                 <p className="text-slate-400 text-sm">Вам будет засчитано поражение.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -485,7 +485,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         )}
 
-        {/* --- STICKY TOP: SCOREBOARD & PROBLEM --- */}
+        {/* --- ВЕРХНЯЯ ЧАСТЬ: ТОЛЬКО СЧЕТ И ПРОГРЕСС (Task убрали отсюда) --- */}
         <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
           
           {/* Scoreboard */}
@@ -519,25 +519,35 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
                <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
              </div>
           </div>
-
-          {/* Question Display */}
-          <div className="px-3 py-4 min-h-[120px] flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
-            {currentProb ? (
-               <div className="text-lg md:text-xl font-bold text-white text-center leading-relaxed">
-                 <Latex>{currentProb.question}</Latex>
-               </div>
-            ) : (
-               <div className="text-white text-sm animate-pulse flex items-center gap-2">
-                 <Loader className="w-4 h-4 animate-spin" /> Загрузка задачи...
-               </div>
-            )}
-          </div>
         </div>
 
-        {/* --- MIDDLE: Scrollable (Empty for now, just spacer) --- */}
-        <div className="flex-1 bg-slate-900" />
+        {/* --- СРЕДНЯЯ ЧАСТЬ: ТЕПЕРЬ ТУТ ЗАДАЧА --- */}
+        {/* Используем flex-1, чтобы занять всё свободное место, и center для выравнивания */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 overflow-y-auto">
+          {currentProb ? (
+             <div className="w-full max-w-lg">
+                {/* Карточка задачи с увеличенным шрифтом */}
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
+                    {/* LaTeX рендеринг */}
+                    <Latex>{currentProb.question}</Latex>
+                  </div>
+                  
+                  {/* Подсказка для типа задачи, если нужно */}
+                  <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
+                    Решите задачу
+                  </div>
+                </div>
+             </div>
+          ) : (
+             <div className="text-white text-sm animate-pulse flex items-center gap-2">
+               <Loader className="w-6 h-6 animate-spin text-cyan-400" /> 
+               <span className="text-lg font-bold">Подготовка задания...</span>
+             </div>
+          )}
+        </div>
 
-        {/* --- BOTTOM: INPUT & KEYPAD --- */}
+        {/* --- НИЖНЯЯ ЧАСТЬ: ВВОД И КЛАВИАТУРА --- */}
         <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20 pb-safe">
           {feedback ? (
             <div className={`p-8 flex flex-col items-center justify-center h-[320px] animate-in zoom-in duration-200 ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
