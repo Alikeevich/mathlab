@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
 import {
   User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, 
-  XCircle, X, Mail, ShieldCheck, GraduationCap, CreditCard, Loader, Shield
+  XCircle, X, Mail, ShieldCheck, GraduationCap, CreditCard, Loader, Shield, ExternalLink
 } from 'lucide-react';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 
@@ -130,8 +130,9 @@ export function Dashboard({ onClose }: DashboardProps) {
     setLoadingRequest(false);
   }
 
-  const handleTeacherPayment = () => {
-    alert("Переход к оплате тарифа Teacher ($9)... (Paddle Integration)");
+  const handleTeacherPaymentRedirect = () => {
+    // Редирект на страницу цен
+    window.location.href = "/pricing";
   };
 
   async function handleSignOut() {
@@ -148,37 +149,16 @@ export function Dashboard({ onClose }: DashboardProps) {
   const getRoleDisplay = () => {
     if (!profile) return { label: 'Guest', color: 'text-slate-400', icon: User, bg: 'bg-slate-700' };
 
-    // Приоритет: Admin > Teacher > Premium > Student
     if (profile.role === 'admin') {
-      return { 
-        label: 'ADMINISTRATOR', 
-        color: 'text-red-400', 
-        icon: Shield, 
-        bg: 'bg-red-500/10 border-red-500/50' 
-      };
+      return { label: 'ADMINISTRATOR', color: 'text-red-400', icon: Shield, bg: 'bg-red-500/10 border-red-500/50' };
     }
     if (profile.role === 'teacher') {
-      return { 
-        label: 'MENTOR', 
-        color: 'text-cyan-400', 
-        icon: GraduationCap, 
-        bg: 'bg-cyan-500/10 border-cyan-500/50' 
-      };
+      return { label: 'MENTOR', color: 'text-cyan-400', icon: GraduationCap, bg: 'bg-cyan-500/10 border-cyan-500/50' };
     }
     if (profile.is_premium) {
-      return { 
-        label: 'PREMIUM AGENT', 
-        color: 'text-amber-400', 
-        icon: Zap, 
-        bg: 'bg-amber-500/10 border-amber-500/50' 
-      };
+      return { label: 'PREMIUM AGENT', color: 'text-amber-400', icon: Zap, bg: 'bg-amber-500/10 border-amber-500/50' };
     }
-    return { 
-      label: 'CADET', 
-      color: 'text-slate-300', 
-      icon: User, 
-      bg: 'bg-slate-800 border-slate-700' 
-    };
+    return { label: 'CADET', color: 'text-slate-300', icon: User, bg: 'bg-slate-800 border-slate-700' };
   };
 
   const roleInfo = getRoleDisplay();
@@ -222,7 +202,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                   <h2 className="text-3xl md:text-4xl font-black text-white mb-1">{profile.username}</h2>
                   <p className="text-slate-400 font-mono text-xs uppercase tracking-wider">ID: {profile.id.split('-')[0]}</p>
                 
-                  {/* Кнопки действий (Выход / Учитель) */}
+                  {/* Кнопки действий */}
                   <div className="flex flex-wrap gap-3 mt-6 justify-center md:justify-start">
                     <button
                       onClick={handleSignOut}
@@ -231,7 +211,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                       <LogOut className="w-4 h-4" /> Выход
                     </button>
 
-                    {/* Статус заявки на учителя */}
+                    {/* Логика "Стать учителем" */}
                     {profile.role !== 'teacher' && profile.role !== 'admin' && (
                       <>
                         {teacherRequestStatus === 'none' && (
@@ -249,10 +229,18 @@ export function Dashboard({ onClose }: DashboardProps) {
                         )}
                         {teacherRequestStatus === 'approved' && (
                           <button
-                            onClick={handleTeacherPayment}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                            onClick={handleTeacherPaymentRedirect}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-900/20 animate-pulse"
                           >
-                            <CreditCard className="w-4 h-4" /> Оплатить тариф Teacher
+                            <CreditCard className="w-4 h-4" /> Активировать статус
+                          </button>
+                        )}
+                        {teacherRequestStatus === 'rejected' && (
+                          <button
+                            onClick={() => setShowTeacherModal(true)}
+                            className="px-4 py-2 bg-red-900/20 text-red-400 border border-red-500/30 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-red-900/40"
+                          >
+                            <XCircle className="w-4 h-4" /> Заявка отклонена. Повторить?
                           </button>
                         )}
                       </>
@@ -260,7 +248,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                   </div>
                 </div>
 
-                {/* Компаньон (справа) */}
+                {/* Компаньон */}
                 {profile.companion_name && (
                   <div className="hidden md:flex flex-col items-center bg-slate-900/50 p-4 rounded-2xl border border-white/5">
                     <img src="/meerkat/avatar.png" alt="Pet" className="w-16 h-16 object-contain mb-2" />
@@ -307,7 +295,6 @@ export function Dashboard({ onClose }: DashboardProps) {
             {/* === ACHIEVEMENTS & HISTORY === */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Достижения */}
               <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
                   <Trophy className="w-5 h-5 text-amber-400" />
@@ -334,7 +321,6 @@ export function Dashboard({ onClose }: DashboardProps) {
                 </div>
               </div>
 
-              {/* История */}
               <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
                   <Clock className="w-5 h-5 text-cyan-400" />
