@@ -119,7 +119,7 @@ function calculateFinalMMR(results: boolean[], provisionalMMR: number): number {
   else if (wins === 0) bonus = -100;
 
   const finalMMR = provisionalMMR + bonus;
-  return Math.max(500, Math.min(1500, finalMMR));
+  return Math.max(500, Math.min(2800, finalMMR));
 }
 
 // === ПОЛУЧИТЬ СТАТУС КАЛИБРОВКИ ===
