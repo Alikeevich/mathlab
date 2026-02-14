@@ -66,7 +66,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [timeLeft, setTimeLeft] = useState(60);
 
   const [botName, setBotName] = useState<string>('Bot');
-  const myMMR = profile?.mmr ?? 1000;
+  const myMMR = profile?.mmr ?? BASE_MMR;
 
   // For Rank reveal after calibration
   const [showRevealModal, setShowRevealModal] = useState(false);
