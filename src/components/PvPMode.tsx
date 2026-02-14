@@ -79,7 +79,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [revealRank, setRevealRank] = useState<PvPRank | null>(null);
 
   // === Bot Setup ===
-  const myMMR = profile?.mmr ?? BASE_MMR;
+  const myMMR = profile?.mmr ?? 700;
   let botDifficulty: 'easy' | 'medium' | 'hard' = 'medium';
   if (myMMR < 800) botDifficulty = 'easy';
   if (myMMR > 1400) botDifficulty = 'hard';
