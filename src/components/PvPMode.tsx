@@ -504,7 +504,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
                 <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
                   <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
                     {/* LaTeX рендеринг (ИСПРАВЛЕНО: добавлены $) */}
-                    <Latex>{`$${currentProb.question}$`}</Latex>
+                    <Latex>{currentProb.question}</Latex>
                   </div>
                  
                   {/* Подсказка для типа задачи */}
