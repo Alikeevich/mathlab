@@ -33,19 +33,16 @@ import { PricingPage } from './components/PricingPage';
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby' | 'analyzer';
 
 function MainApp() {
-  const { user, loading, profile, refreshProfile } = useAuth();
+  const { user, loading, profile } = useAuth();
   const [view, setView] = useState<View>('map');
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   
-  // Состояние для списка задач тренировки
   const [trainingProblemIds, setTrainingProblemIds] = useState<string[] | null>(null);
   
-  // Состояния доступа
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Состояния модальных окон
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -58,11 +55,9 @@ function MainApp() {
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | 'refund' | null>(null);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
-  // === ЛОГИКА АКТИВНОЙ СЕССИИ ===
   const [activeGameSession, setActiveGameSession] = useState<{ duelId: string, tournamentId?: string } | null>(null);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
-  // === ФУНКЦИЯ ВХОДА В ТУРНИР (по коду) ===
   async function joinTournament(code: string) {
     if (!user) return;
     const { data: tour } = await supabase
@@ -85,12 +80,10 @@ function MainApp() {
     }
   }
 
-  // === АВТО-ПРОВЕРКА АКТИВНЫХ СЕССИЙ ===
   useEffect(() => {
     async function checkActiveSession() {
       if (!user) return;
       
-      // 1. Ищем АКТИВНУЮ ДУЭЛЬ
       const { data: duel } = await supabase
         .from('duels')
         .select('id, tournament_id, status')
@@ -104,7 +97,6 @@ function MainApp() {
         setActiveGameSession(null);
       }
 
-      // 2. Если нет дуэли, проверяем Турнир
       if (!duel) {
         const { data: part } = await supabase
           .from('tournament_participants')
@@ -157,14 +149,12 @@ function MainApp() {
     };
   }, [user]);
 
-  // Проверка кода турнира в URL
   useEffect(() => {
     if (!user) return;
     const tCode = new URLSearchParams(window.location.search).get('t');
     if (tCode) joinTournament(tCode);
   }, [user]);
 
-  // АВТО-ОТКРЫТИЕ АДМИНКИ ДЛЯ УЧИТЕЛЕЙ
   useEffect(() => {
     async function checkHosting() {
       if (!user) return;
@@ -211,7 +201,7 @@ function MainApp() {
   function handleStartExperiment(module: Module) {
     setSelectedModule(module);
     setView('reactor');
-    setTrainingProblemIds(null); // Сбрасываем тренировку при обычном запуске
+    setTrainingProblemIds(null);
   }
 
   function handleBackToMap() {
@@ -220,18 +210,10 @@ function MainApp() {
     setTrainingProblemIds(null);
   }
 
-  function handleBackToModules() {
-    setView('modules');
-    setSelectedModule(null);
-    setTrainingProblemIds(null);
-  }
-
-  // === ЗАПУСК ТРЕНИРОВКИ ОШИБОК ===
   function handleStartErrorTraining(problemIds: string[]) {
     setTrainingProblemIds(problemIds);
-    // Создаем фиктивный модуль, так как Reactor требует объект модуля
     setSelectedModule({
-      id: 'error_training', // Уникальный ID для режима тренировки
+      id: 'error_training',
       sector_id: 0,
       name: 'Работа над ошибками',
       theory_content: '',
@@ -280,7 +262,6 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
       
-      {/* ФОНОВАЯ АНИМАЦИЯ */}
       <div className="absolute inset-0 z-0">
         <PixelBlast
           variant="circle"
@@ -306,7 +287,6 @@ function MainApp() {
 
       <div className="relative z-10 h-full flex flex-col">
         
-        {/* === STICKY RECONNECT === */}
         {activeGameSession && view !== 'pvp' && view !== 'tournament_lobby' && (
           <StickyReconnect
             duelId={activeGameSession.duelId}
@@ -327,7 +307,6 @@ function MainApp() {
           />
         )}
 
-        {/* HEADER */}
         <Header
           user={user}
           profile={profile}
@@ -340,7 +319,6 @@ function MainApp() {
           onShowAuth={() => setShowAuthModal(true)}
         />
 
-        {/* MAIN CONTENT */}
         <main className="relative z-0 pb-24 md:pb-20 flex-1">
           {view === 'map' && (
             <>
@@ -424,7 +402,6 @@ function MainApp() {
         </main>
       </div>
 
-      {/* МОДАЛКИ */}
       {user && (
         <>
           {showCompanionSetup && (
@@ -452,11 +429,8 @@ function MainApp() {
 
           <LevelUpManager />
 
-          {/* ПАНЕЛЬ УПРАВЛЕНИЯ (АДМИНЫ И УЧИТЕЛЯ) */}
           {(profile?.role === 'admin' || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
-              
-              {/* 1. Кнопка ТУРНИРОВ (для учителей и админов) */}
               <button
                 onClick={() => setShowTournamentAdmin(true)}
                 className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"
@@ -465,10 +439,8 @@ function MainApp() {
                 <Crown className="w-6 h-6" />
               </button>
 
-              {/* ТОЛЬКО ДЛЯ АДМИНОВ */}
               {profile?.role === 'admin' && (
                 <>
-                  {/* 2. Генератор задач */}
                   <button
                     onClick={() => setShowAdmin(true)}
                     className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm hover:bg-cyan-500 hover:text-black transition-all"
@@ -477,7 +449,6 @@ function MainApp() {
                     <Settings className="w-6 h-6" />
                   </button>
 
-                  {/* 3. Админ Dashboard */}
                   <button
                     onClick={() => setShowAdminDashboard(true)}
                     className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white transition-all"
@@ -495,6 +466,7 @@ function MainApp() {
   );
 }
 
+// === ИЗМЕНЕННАЯ ФУНКЦИЯ APP ===
 function App() {
   const [path, setPath] = useState(window.location.pathname);
 
@@ -504,18 +476,18 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Роутинг для служебных страниц
-  if (path === '/terms-and-conditions' || path === '/terms') {
-    return <TermsPage />;
-  }
-  
-  if (path === '/pricing') {
-    return <PricingPage />;
-  }
-
+  // ВАЖНО: AuthProvider теперь оборачивает ВСЁ, включая логику роутинга
   return (
     <AuthProvider>
-      <MainApp />
+      {(() => {
+        if (path === '/terms-and-conditions' || path === '/terms') {
+          return <TermsPage />;
+        }
+        if (path === '/pricing') {
+          return <PricingPage />;
+        }
+        return <MainApp />;
+      })()}
     </AuthProvider>
   );
 }
