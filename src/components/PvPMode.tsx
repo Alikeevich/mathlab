@@ -341,19 +341,20 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setRevealOldMMR(oldMMR);
 
     // 1. Calibration Logic
-    if (profile?.is_calibrating && user) {
+    if (user && !profile?.has_calibrated) {
       try {
+        // Вызываем запись матча
         const result = await recordCalibrationMatch(user.id, isWin, opponentMMR);
-        // If calibration just finished (isCalibrating became false)
+        
+        // Если это был 5-й матч и калибровка завершилась
         if (result && !result.isCalibrating) {
           const finalMMR = result.provisionalMMR;
           setRevealNewMMR(finalMMR);
           setRevealRank(getPvPRank(finalMMR));
           setShowRevealModal(true);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Calibration error:", e); }
     }
-
     // 2. XP Logic (Only if Win)
     if (isWin && user) {
       try {
