@@ -351,33 +351,38 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   // 1. Lobby
   if (status === 'lobby') {
     const isUnranked = !!(profile && !profile.has_calibrated);
-    // ИСПРАВЛЕНО: Теперь берем корректное значение сыгранных матчей
     const calibPlayed = profile?.calibration_matches_played ?? 0;
+
     return (
       <>
         {showRevealModal && revealRank && revealNewMMR !== null && revealOldMMR !== null && (
           <RankUpModal newRank={revealRank} oldMMR={revealOldMMR} newMMR={revealNewMMR} onClose={() => setShowRevealModal(false)} />
         )}
+        
+        {/* Модалка с легендой рангов */}
         {showRankLegend && <RankLegendModal onClose={() => setShowRankLegend(false)} />}
-       
+
         <div className="flex items-center justify-center h-full animate-in fade-in duration-300">
           <div className="text-center space-y-8 max-w-md w-full p-8 bg-slate-800/50 rounded-2xl border border-red-500/30 shadow-2xl relative">
-           
-            {/* Инфо кнопка в углу */}
-            <button
+            
+            {/* ЕДИНСТВЕННАЯ КНОПКА ИНФО В УГЛУ */}
+            <button 
               onClick={() => setShowRankLegend(true)}
               className="absolute top-4 right-4 p-2 bg-slate-700/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all border border-white/5"
+              title="Инфо о рангах"
             >
               <Info className="w-5 h-5" />
             </button>
+
             <div className="mx-auto w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center animate-pulse">
               <Zap className="w-12 h-12 text-red-500" />
             </div>
-           
+
             <div>
               <h1 className="text-4xl font-black text-white italic uppercase mb-2">PVP АРЕНА</h1>
               <p className="text-red-300/60">Битва умов в реальном времени</p>
             </div>
+
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
               <div className="text-sm text-slate-400 mb-1">Ваш статус</div>
               <div className="text-2xl font-bold text-white">
@@ -392,23 +397,16 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
                 )}
               </div>
             </div>
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={findMatch}
-                className="flex-1 py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-bold text-white text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Play className="w-6 h-6 fill-current" />
-                В БОЙ!
-              </button>
-             
-              {/* Вторая кнопка "?" рядом с основной */}
-              <button
-                onClick={() => setShowRankLegend(true)}
-                className="px-5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-600 transition-all active:scale-95 group"
-              >
-                <Target className="w-6 h-6 text-slate-500 group-hover:text-cyan-400" />
-              </button>
-            </div>
+
+            {/* КНОПКА ПОИСКА НА ВСЮ ШИРИНУ */}
+            <button 
+              onClick={findMatch} 
+              className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-bold text-white text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Play className="w-6 h-6 fill-current" />
+              НАЙТИ СОПЕРНИКА
+            </button>
+
             <button onClick={onBack} className="text-slate-500 hover:text-white text-sm flex items-center justify-center gap-2 mx-auto">
               <ArrowLeft className="w-4 h-4" /> Вернуться в лабораторию
             </button>
