@@ -387,18 +387,39 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     } else {
         isWin = winnerId === user!.id;
     }
-
+  
     setMmrChange(Math.abs(eloChange));
     setWinner(isWin ? 'me' : 'opponent');
-
-    // === НАЧИСЛЕНИЕ ОПЫТА ЗА ПОБЕДУ ===
+  
+    // ===============================
+    // 🔥 КАЛИБРОВКА
+    // ===============================
+    if (profile?.is_calibrating && user) {
+      try {
+        await recordCalibrationMatch(
+          user.id,
+          isWin,
+          opponentMMR
+        );
+      } catch (e) {
+        console.error('Calibration error:', e);
+      }
+    }
+  
+    // ===============================
+    // XP ЗА ПОБЕДУ
+    // ===============================
     if (isWin && user) {
-        const xpAmount = 50; // За победу в PvP даем 50 опыта
-        const xpRes = await grantXp(user.id, profile?.is_premium || false, xpAmount);
+        const xpAmount = 50;
+        const xpRes = await grantXp(
+          user.id,
+          profile?.is_premium || false,
+          xpAmount
+        );
         if (xpRes) setXpGained(xpRes.gained);
     }
-
-    refreshProfile();
+  
+    await refreshProfile();
     
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
   }
