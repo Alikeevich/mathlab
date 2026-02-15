@@ -218,8 +218,8 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       {/* === ОСНОВНАЯ КЛАВИАТУРА === */}
       <div className="flex flex-col gap-1.5 select-none pb-1 touch-none">
         
-        {/* ВЕРХНЯЯ ПАНЕЛЬ */}
-        <div className="grid grid-cols-4 gap-1.5">
+        {/* ВЕРХНЯЯ ПАНЕЛЬ - ТЕПЕРЬ С ПЕРЕКЛЮЧАТЕЛЕМ */}
+        <div className="grid grid-cols-5 gap-1.5">
            <Key onClick={() => onCommand('perform', 'moveToPreviousChar')} className="bg-slate-800 py-2 text-slate-400">
              <ArrowLeft className="w-5 h-5"/>
            </Key>
@@ -231,6 +231,10 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
            </Key>
            <Key onClick={onClear} className="bg-slate-800 text-slate-500 text-[10px] uppercase py-2">
              CLR
+           </Key>
+           {/* ПЕРЕКЛЮЧАТЕЛЬ ВСЕГДА ЗДЕСЬ */}
+           <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-xs py-2">
+             {getTabLabel()}
            </Key>
         </div>
 
@@ -279,22 +283,16 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                  
                  {/* ЦИФРЫ */}
                  <div className="grid grid-cols-3 gap-1.5">
-                    {['7','8','9','4','5','6','1','2','3'].map(n => (
+                    {['7','8','9','4','5','6','1','2','3','0'].map(n => (
                       <Key key={n} onClick={() => onCommand('insert', n)} className="bg-slate-800 text-white text-xl py-2.5">
                         {n}
                       </Key>
                     ))}
-                 </div>
-
-                 <div className="grid grid-cols-3 gap-1.5">
-                    <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-xs py-2.5">
-                      {getTabLabel()}
-                    </Key>
-                    <Key onClick={() => onCommand('insert', '0')} className="bg-slate-800 text-white text-xl py-2.5">
-                      0
-                    </Key>
                     <Key onClick={() => onCommand('insert', '.')} className="bg-slate-800 text-white text-xl py-2.5">
                       ,
+                    </Key>
+                    <Key onClick={() => onCommand('insert', '\\,')} className="bg-slate-600 text-slate-300 text-xs py-2.5">
+                      пробел
                     </Key>
                  </div>
                </>
@@ -326,18 +324,12 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                       </Key>
                     ))}
                  </div>
-                 
-                 <div className="grid grid-cols-1 gap-1.5">
-                    <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-xs py-2.5">
-                      {getTabLabel()}
-                    </Key>
-                 </div>
                </>
              )}
 
              {activeTab === 'sym' && (
                <>
-                 <div className="grid grid-cols-4 gap-1.5 h-full content-start">
+                 <div className="grid grid-cols-4 gap-1.5">
                     {symbolsKeys.map((k, i) => (
                       <Key 
                         key={i} 
@@ -363,10 +355,7 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                     <Key onClick={() => onCommand('insert', '^\\circ')} className="bg-slate-700 text-cyan-300 py-2.5">
                       °
                     </Key>
-                    
-                    <Key onClick={toggleTab} className="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-xs py-2.5">
-                      {getTabLabel()}
-                    </Key>
+                    <div></div> {/* Пустое место для выравнивания */}
                  </div>
                </>
              )}
