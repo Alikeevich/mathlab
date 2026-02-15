@@ -301,16 +301,11 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                     ))}
                  </div>
 
-                 {/* НИЖНИЙ РЯД ЦИФРОВОЙ ВКЛАДКИ */}
-                 <div className="grid grid-cols-3 gap-1.5">
-                    <Key onClick={() => onCommand('insert', '0')} className="bg-slate-800 text-white text-xl py-3">
-                      0
-                    </Key>
-                    <Key onClick={() => onCommand('insert', '.')} className="bg-slate-800 text-white text-xl py-3">
+ => onCommand('insert', '.')} className="bg-slate-800 text-white text-xl py-3">
                       ,
                     </Key>
-                    <Key onClick={() => onCommand('insert', '\\,')} className="bg-slate-600 text-slate-300 text-xs py-3">
-                      пробел
+                    <Key onClick={() => onCommand('insert', ';')} className="bg-slate-800 text-white text-xl py-3">
+                      ;
                     </Key>
                  </div>
                </>
