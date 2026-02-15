@@ -293,21 +293,17 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                  </div>
                  
                  {/* ЦИФРЫ 3x3 */}
-                 <div className="grid grid-cols-3 gap-1.5">
-                    {['7','8','9','4','5','6','1','2','3'].map(n => (
-                      <Key key={n} onClick={() => onCommand('insert', n)} className="bg-slate-800 text-white text-xl py-3">
-                        {n}
-                      </Key>
-                    ))}
-                 </div>
-
- => onCommand('insert', '.')} className="bg-slate-800 text-white text-xl py-3">
-                      ,
-                    </Key>
-                    <Key onClick={() => onCommand('insert', ';')} className="bg-slate-800 text-white text-xl py-3">
-                      ;
-                    </Key>
-                 </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                   <Key onClick={() => onCommand('insert', '0')}>
+                     0
+                   </Key>
+                   <Key onClick={() => onCommand('insert', '.')}>
+                     ,
+                   </Key>
+                   <Key onClick={() => onCommand('insert', ';')}>
+                     ;
+                   </Key>
+                </div>
                </>
              )}
 
