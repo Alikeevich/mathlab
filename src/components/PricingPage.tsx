@@ -3,6 +3,12 @@ import { ArrowLeft, Check, Zap, GraduationCap, X, Lock, Loader, ShieldCheck } fr
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
+import { getPaddleInstance } from '../lib/paddle';
+
+const PADDLE_PRICE_IDS = {
+  PREMIUM: 'pro_01khs2jy2vbmjj09q91p38nkbf', 
+  TEACHER: 'pro_01khs2jq904f4sxeggrd55ynr3' 
+};
 
 export function PricingPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -12,6 +18,25 @@ export function PricingPage() {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const openCheckout = async (priceId: string) => {
+    if (!user) return alert("Пожалуйста, войдите в аккаунт.");
+    
+    const paddle = await getPaddleInstance();
+    if (!paddle) return alert("Ошибка инициализации платежной системы");
+
+    paddle.Checkout.open({
+      items: [{ priceId: priceId, quantity: 1 }],
+      customData: {
+        userId: user.id, // ВАЖНО: Привязываем платеж к ID юзера
+        tier: priceId === PADDLE_PRICE_IDS.TEACHER ? 'teacher' : 'premium'
+      },
+      settings: {
+        displayMode: 'overlay',
+        theme: 'dark',
+        locale: 'ru'
+      }
+    });
+  };
 
   useEffect(() => {
     async function checkStatus() {
@@ -109,7 +134,7 @@ export function PricingPage() {
       icon: <Zap className="w-4 h-4" />,
       action: (
         <button 
-          onClick={handlePremiumPurchase}
+          onClick={() => openCheckout(PADDLE_PRICE_IDS.PREMIUM)}
           className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 shadow-lg shadow-orange-900/30 transition-all active:scale-95"
         >
           Купить Premium
@@ -144,12 +169,12 @@ export function PricingPage() {
         if (requestStatus === 'approved') {
           return (
             <button 
-              onClick={handleTeacherPurchase}
+              onClick={() => openCheckout(PADDLE_PRICE_IDS.TEACHER)}
               disabled={processingPayment}
-              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="..."
             >
-              {processingPayment ? <Loader className="w-4 h-4 animate-spin"/> : <ShieldCheck className="w-4 h-4"/>}
-              {processingPayment ? 'Обработка...' : 'Купить доступ'}
+              {processingPayment ? <Loader.../> : <ShieldCheck.../>}
+              {processingPayment ? 'Загрузка...' : 'Оплатить доступ'}
             </button>
           );
         }
