@@ -7,8 +7,8 @@ import { getPaddleInstance } from '../lib/paddle';
 
 // ID Цен из Paddle Dashboard
 const PADDLE_PRICE_IDS = {
-  PREMIUM: 'pro_01khs2jy2vbmjj09q91p38nkbf', 
-  TEACHER: 'pro_01khs2jq904f4sxeggrd55ynr3' 
+  PREMIUM: 'pri_01khs53cszmhn5qykdx9xhrnye', 
+  TEACHER: 'pri_01khs5680ekb96nzm3ebkrxer2' 
 };
 
 export function PricingPage() {
