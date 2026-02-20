@@ -7,18 +7,18 @@ import { BecomeTeacherModal } from './BecomeTeacherModal';
 import { getPaddleInstance } from '../lib/paddle';
 
 const PADDLE_PRICE_IDS = {
-  PREMIUM: 'pro_01khs2jy2vbmjj09q91p38nkbf', 
-  TEACHER: 'pro_01khs2jq904f4sxeggrd55ynr3' 
+  PREMIUM: 'pri_01khs2jy2vbmjj09q91p38nkbf', 
+  TEACHER: 'pri_01khs2jq904f4sxeggrd55ynr3' 
 };
 
 export function PricingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
   
-  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
-  const [loading, setLoading] = useState(true);
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const = useState(true);
+  const = useState(false);
+  const = useState(false);
 
   useEffect(() => {
     async function checkStatus() {
@@ -39,22 +39,22 @@ export function PricingPage() {
       setLoading(false);
     }
     checkStatus();
-  }, [user]);
+  },);
 
   const openCheckout = async (priceId: string) => {
-    if (!user) return alert("Пожалуйста, войдите в аккаунт.");
+    if (!user) return alert(t('pricing.alert_login'));
     
     setProcessingPayment(true);
     
     try {
       const paddle = await getPaddleInstance();
       if (!paddle) {
-        alert("Ошибка инициализации платежной системы");
+        alert(t('pricing.alert_paddle_init'));
         return;
       }
 
       paddle.Checkout.open({
-        items: [{ priceId: priceId, quantity: 1 }],
+        items:,
         customData: {
           userId: user.id,
           tier: priceId === PADDLE_PRICE_IDS.TEACHER ? 'teacher' : 'premium'
@@ -62,33 +62,25 @@ export function PricingPage() {
         settings: {
           displayMode: 'overlay',
           theme: 'dark',
-          locale: 'ru'
+          locale: i18n.language === 'kk' ? 'en' : 'ru' // Paddle не поддерживает 'kk', используем 'en' как фоллбэк
         }
       });
     } catch (error) {
       console.error("Paddle Error:", error);
-      alert("Не удалось открыть окно оплаты.");
+      alert(t('pricing.alert_paddle_open'));
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  const plans = [
+  const plans =[
     {
       name: 'Cadet',
       price: '$0',
-      period: t('pricing.per_forever'), // / навсегда
+      period: t('pricing.per_forever'),
       description: t('pricing.plan_cadet_desc'),
-      features: [
-        t('pricing.feat_pvp'),
-        t('pricing.feat_suricat'),
-        t('pricing.feat_modules')
-      ],
-      notIncluded: [
-        t('pricing.feat_errors'),
-        t('pricing.feat_xp'),
-        t('pricing.feat_tournaments')
-      ],
+      features:,
+      notIncluded:,
       color: 'slate',
       icon: <Zap className="w-4 h-4" />,
       action: <button className="w-full py-4 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-default">{t('pricing.current_plan')}</button>,
@@ -97,19 +89,10 @@ export function PricingPage() {
     {
       name: 'Premium',
       price: '$7',
-      period: t('pricing.per_month'), // / месяц
+      period: t('pricing.per_month'),
       description: t('pricing.plan_premium_desc'),
-      features: [
-        t('pricing.feat_all_free'),
-        t('pricing.feat_errors'),
-        t('pricing.feat_x2_xp'),
-        t('pricing.feat_badge'),
-        t('pricing.feat_priority')
-      ],
-      notIncluded: [
-        t('pricing.feat_tournaments'),
-        t('pricing.feat_custom_tasks')
-      ],
+      features:,
+      notIncluded:,
       color: 'amber',
       icon: <Zap className="w-4 h-4" />,
       action: (
@@ -132,16 +115,10 @@ export function PricingPage() {
     {
       name: 'Teacher',
       price: '$9',
-      period: t('pricing.per_month'), // / месяц
+      period: t('pricing.per_month'),
       description: t('pricing.plan_teacher_desc'),
-      features: [
-        t('pricing.feat_all_premium'),
-        t('pricing.feat_closed_tour'),
-        t('pricing.feat_site_tasks'),
-        t('pricing.feat_analytics'),
-        t('pricing.feat_teacher_status')
-      ],
-      notIncluded: [],
+      features:,
+      notIncluded:[],
       color: 'cyan',
       icon: <GraduationCap className="w-4 h-4" />,
       highlight: false,
@@ -253,10 +230,10 @@ export function PricingPage() {
               {plan.action}
               
               {plan.name === 'Teacher' && requestStatus === 'none' && (
-                <p className="text-[10px] text-center mt-3 text-slate-500">Требуется подтверждение документов</p>
+                <p className="text- text-center mt-3 text-slate-500">{t('pricing.teacher_req_docs')}</p>
               )}
               {plan.name === 'Teacher' && requestStatus === 'approved' && profile?.role !== 'teacher' && (
-                <p className="text-[10px] text-center mt-3 text-emerald-400 font-bold">Верификация пройдена! Оплатите для доступа.</p>
+                <p className="text- text-center mt-3 text-emerald-400 font-bold">{t('pricing.teacher_approved_pay')}</p>
               )}
             </div>
           ))}
@@ -266,7 +243,7 @@ export function PricingPage() {
           <div className="flex flex-wrap justify-center gap-6 mb-4 font-medium text-slate-500">
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.terms')}</a>
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.privacy')}</a>
-            <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.refund')}</a>
+            <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('pricing.refund')}</a>
           </div>
           <p className="mb-2">MathLab PvP © {new Date().getFullYear()}. {t('pricing.footer_rights')}</p>
           <p>Secure payments powered by <strong>Paddle</strong>.</p>
