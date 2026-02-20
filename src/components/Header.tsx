@@ -4,7 +4,7 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Profile, supabase } from '../lib/supabase';
 import { getRank, getLevelProgress } from '../lib/gameLogic';
 import { NotificationsModal } from './NotificationsModal';
-import { LanguageSwitcher } from './LanguageSwitcher'; // <--- 1. ДОБАВЛЕН ИМПОРТ
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 type Props = {
   user: SupabaseUser | null;
