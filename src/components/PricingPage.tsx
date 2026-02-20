@@ -134,8 +134,14 @@ export function PricingPage() {
       price: '$9',
       period: t('pricing.per_month'),
       description: t('pricing.plan_teacher_desc'),
-      features:,
-      notIncluded:[],
+      features: [
+        t('pricing.feat_all_premium'),
+        t('pricing.feat_closed_tour'),
+        t('pricing.feat_site_tasks'),
+        t('pricing.feat_analytics'),
+        t('pricing.feat_teacher_status')
+      ],
+      notIncluded: [],
       color: 'cyan',
       icon: <GraduationCap className="w-4 h-4" />,
       highlight: false,
