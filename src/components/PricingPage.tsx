@@ -79,8 +79,16 @@ export function PricingPage() {
       price: '$0',
       period: t('pricing.per_forever'),
       description: t('pricing.plan_cadet_desc'),
-      features:,
-      notIncluded:,
+      features: [
+        t('pricing.feat_pvp'),
+        t('pricing.feat_suricat'),
+        t('pricing.feat_modules')
+      ],
+      notIncluded: [
+        t('pricing.feat_errors'),
+        t('pricing.feat_xp'),
+        t('pricing.feat_tournaments')
+      ],
       color: 'slate',
       icon: <Zap className="w-4 h-4" />,
       action: <button className="w-full py-4 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-default">{t('pricing.current_plan')}</button>,
@@ -91,8 +99,17 @@ export function PricingPage() {
       price: '$7',
       period: t('pricing.per_month'),
       description: t('pricing.plan_premium_desc'),
-      features:,
-      notIncluded:,
+      features: [
+        t('pricing.feat_all_free'),
+        t('pricing.feat_errors'),
+        t('pricing.feat_x2_xp'),
+        t('pricing.feat_badge'),
+        t('pricing.feat_priority')
+      ],
+      notIncluded: [
+        t('pricing.feat_tournaments'),
+        t('pricing.feat_custom_tasks')
+      ],
       color: 'amber',
       icon: <Zap className="w-4 h-4" />,
       action: (
