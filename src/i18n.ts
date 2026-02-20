@@ -46,7 +46,6 @@ const resources = {
         error_agree: "Необходимо принять условия соглашения",
         error_name: "Имя пользователя обязательно"
       },
-      // НОВЫЕ СЕКЦИИ
       map: {
         demo_mode: "РЕЖИМ: ДЕМО-ДОСТУП",
         access_level: "УРОВЕНЬ ДОСТУПА",
@@ -106,7 +105,30 @@ const resources = {
         opening: "Открытие кассы...",
         loading: "Загрузка...",
         already_bought: "Уже куплено",
-        footer_rights: "Все права защищены."
+        footer_rights: "Все права защищены.",
+        features_free: "Доступ к PvP арене",
+        features_prem: "Журнал ошибок"
+      },
+      dashboard: {
+        title: "Личное Дело",
+        level: "Уровень",
+        solved: "Задач решено",
+        accuracy: "Точность",
+        achievements: "Достижения",
+        history: "Последняя активность",
+        no_awards: "Нет наград",
+        empty_log: "Журнал пуст",
+        support: "Служба поддержки",
+        logout: "Выход",
+        become_teacher: "Стать учителем",
+        teacher_pending: "Заявка на проверке",
+        activate_status: "Активировать статус",
+        rejected: "Заявка отклонена. Повторить?",
+        role_admin: "ADMINISTRATOR",
+        role_mentor: "MENTOR",
+        role_premium: "PREMIUM AGENT",
+        role_cadet: "CADET",
+        role_guest: "GUEST"
       }
     }
   },
@@ -213,7 +235,30 @@ const resources = {
         opening: "Касса ашылуда...",
         loading: "Жүктелуде...",
         already_bought: "Сатып алынды",
-        footer_rights: "Барлық құқықтар қорғалған."
+        footer_rights: "Барлық құқықтар қорғалған.",
+        features_free: "PvP аренаға кіру",
+        features_prem: "Қателер журналы"
+      },
+      dashboard: {
+        title: "Жеке іс",
+        level: "Деңгей",
+        solved: "Шешілген есептер",
+        accuracy: "Дәлдік",
+        achievements: "Жетістіктер",
+        history: "Соңғы белсенділік",
+        no_awards: "Марапаттар жоқ",
+        empty_log: "Журнал бос",
+        support: "Қолдау қызметі",
+        logout: "Шығу",
+        become_teacher: "Мұғалім болу",
+        teacher_pending: "Өтінім тексерілуде",
+        activate_status: "Статусты белсендіру",
+        rejected: "Өтінім қабылданбады. Қайталау?",
+        role_admin: "ӘКІМШІ",
+        role_mentor: "МЕНТОР",
+        role_premium: "PREMIUM АГЕНТ",
+        role_cadet: "КУРСАНТ",
+        role_guest: "ҚОНАҚ"
       }
     }
   }
