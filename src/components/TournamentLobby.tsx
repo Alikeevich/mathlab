@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next'; // Перевод
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Users, Loader, Shield, RefreshCw } from 'lucide-react';
@@ -11,7 +12,9 @@ type LobbyProps = {
 };
 
 export function TournamentLobby({ tournamentId }: LobbyProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  
   const [participants, setParticipants] = useState<any[]>([]);
   const [tournamentCode, setTournamentCode] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
@@ -21,8 +24,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   const [showReconnect, setShowReconnect] = useState(false);
   const [reconnectTournamentId, setReconnectTournamentId] = useState<string | null>(null);
   const [reconnectDuelId, setReconnectDuelId] = useState<string | null>(null);
-
-  // === ИСПРАВЛЕНИЕ: Флаг для предотвращения повторных проверок ===
   const [hasCheckedReconnect, setHasCheckedReconnect] = useState(false);
 
   useEffect(() => {
@@ -40,16 +41,14 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     async function checkActiveTournament() {
       if (!user || hasCheckedReconnect) return;
       
-      // === ИСПРАВЛЕНИЕ: Проверяем только если это НЕ текущий турнир ===
       const { data: participation, error } = await supabase
         .from('tournament_participants')
         .select('tournament_id, tournaments(status)')
         .eq('user_id', user.id)
-        .neq('tournament_id', tournamentId) // ❗ Игнорируем текущий турнир
+        .neq('tournament_id', tournamentId) 
         .in('tournaments.status', ['active', 'waiting'])
         .maybeSingle();
 
-      // Помечаем, что проверку выполнили
       setHasCheckedReconnect(true);
 
       if (error || !participation) {
@@ -57,11 +56,9 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
         return;
       }
 
-      // Если есть другой активный турнир — предлагаем переподключиться
       if (['active', 'waiting'].includes(participation.tournaments.status)) {
         setReconnectTournamentId(participation.tournament_id);
         
-        // Проверяем активный дуэль
         const { data: duel } = await supabase
           .from('duels')
           .select('id')
@@ -123,7 +120,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     }
   }
 
-  // === РЕЖИМ БОЯ ===
   if (activeDuelId) {
     return (
       <TournamentPlay
@@ -136,26 +132,20 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     );
   }
 
-  // === ИСПРАВЛЕНИЕ: Модалка реконнекта с localStorage флагом ===
   if (showReconnect) {
     return (
       <ReconnectModal
         onReconnect={() => {
           setShowReconnect(false);
-          
           if (reconnectDuelId) {
-            // Переходим в активный матч
             setActiveDuelId(reconnectDuelId);
           } else if (reconnectTournamentId) {
-            // ИСПРАВЛЕНИЕ: Используем sessionStorage вместо редиректа
             sessionStorage.setItem('reconnecting_tournament', reconnectTournamentId);
             window.location.href = `/?t=${reconnectTournamentId}`;
           }
         }}
         onCancel={async () => {
           setShowReconnect(false);
-          
-          // Удаляем старое участие
           if (reconnectTournamentId && user) {
             await supabase
               .from('tournament_participants')
@@ -163,8 +153,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
               .eq('user_id', user.id)
               .eq('tournament_id', reconnectTournamentId);
           }
-          
-          // Загружаем текущее лобби
           const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single();
           if (data) {
             setTournamentCode(data.code);
@@ -177,13 +165,12 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     );
   }
 
-  // === СЕТКА ===
   if (status === 'active' || status === 'finished') {
     return (
       <div className="h-full p-4 md:p-8 flex flex-col">
         {!activeDuelId && status === 'active' && (
            <div className="bg-slate-800 p-4 text-center text-slate-400 mb-4 rounded-xl border border-slate-700 animate-pulse">
-             Ожидайте завершения других матчей... Ваш бой скоро появится.
+             {t('tournaments.wait_other_matches')}
            </div>
         )}
         <div className="flex-1 overflow-hidden">
@@ -196,7 +183,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     );
   }
 
-  // === ЛОББИ ===
   return (
     <div className="flex items-center justify-center h-full p-4">
       <div className="w-full max-w-5xl bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
@@ -206,24 +192,24 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <Shield className="w-8 h-8 text-cyan-400" />
-              <h1 className="text-3xl font-black text-white uppercase italic">Турнирное Лобби</h1>
+              <h1 className="text-3xl font-black text-white uppercase italic">{t('tournaments.lobby_title')}</h1>
             </div>
-            <p className="text-slate-400 text-sm">Код: <span className="text-cyan-400 font-mono font-bold text-lg ml-2">{tournamentCode}</span></p>
+            <p className="text-slate-400 text-sm">{t('tournaments.code')} <span className="text-cyan-400 font-mono font-bold text-lg ml-2">{tournamentCode}</span></p>
           </div>
           <div className="flex items-center gap-3 bg-slate-800 px-6 py-3 rounded-full border border-slate-700">
             <Loader className="w-5 h-5 text-cyan-400 animate-spin" />
-            <span className="text-white font-medium animate-pulse">Ожидание организатора...</span>
+            <span className="text-white font-medium animate-pulse">{t('tournaments.waiting_host')}</span>
           </div>
         </div>
 
         <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-800 min-h-[300px]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider font-bold">Участники ({participants.length})</h3>
+            <h3 className="text-slate-400 text-sm uppercase tracking-wider font-bold">{t('tournaments.participants')} ({participants.length})</h3>
             <div className="flex items-center gap-2">
               <button
                 onClick={fetchParticipants}
                 className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-                title="Обновить список"
+                title={t('tournaments.refresh')}
               >
                 <RefreshCw className="w-5 h-5" />
               </button>
