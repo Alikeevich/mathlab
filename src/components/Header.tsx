@@ -27,8 +27,8 @@ export function Header({
   const currentRank = profile ? getRank(profile.clearance_level, profile.role) : { title: 'Гость', color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
-  const = useState(false);
-  const = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
