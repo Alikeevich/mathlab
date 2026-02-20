@@ -266,7 +266,7 @@ export function PricingPage() {
           <div className="flex flex-wrap justify-center gap-6 mb-4 font-medium text-slate-500">
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.terms')}</a>
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.privacy')}</a>
-            <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">Возврат средств</a>
+            <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.refund')}</a>
           </div>
           <p className="mb-2">MathLab PvP © {new Date().getFullYear()}. {t('pricing.footer_rights')}</p>
           <p>Secure payments powered by <strong>Paddle</strong>.</p>
