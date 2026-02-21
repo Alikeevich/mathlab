@@ -144,11 +144,17 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const handleAdminForceWin = async () => {
     if (!duelId || !user) return;
   
-    // Ставим себе максимум очков чтобы finish_duel точно определил нас победителем
+    // 1. Сначала обновляем счёт
     const myUpdateData = await getMyUpdateData(problems.length, problems.length);
     await supabase.from('duels').update(myUpdateData).eq('id', duelId);
   
+    // 2. Принудительно ставим finished ДО вызова RPC
+    await supabase.from('duels').update({ status: 'finished' }).eq('id', duelId);
+  
+    // 3. Вызываем RPC для пересчёта MMR
     await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user.id });
+  
+    // 4. Завершаем локально
     endGame(isBotMatch ? 'me' : user.id, 99);
   };
 
