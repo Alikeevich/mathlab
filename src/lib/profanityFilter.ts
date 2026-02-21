@@ -1,33 +1,17 @@
-import filter from 'leo-profanity';
+import { Filter } from 'glin-profanity';
 
-// Загружаем оба словаря сразу
-filter.loadDictionary('en');
-filter.addDictionary('ru', filter.getDictionary('ru')); // встроенный русский
+const filter = new Filter({
+  languages: ['english', 'russian'],
+  detectLeetspeak: true,
+  leetspeakLevel: 'aggressive',
+  normalizeUnicode: true,
+});
 
-// Добавляем свои слова которых нет в словаре
-filter.add([
-  // Leetspeak обходы которые библиотека не ловит
-  'f4ck', 'sh1t', 'a55', 'b1tch',
-  // Зарезервированные ники
+filter.addWords([
   'admin', 'moderator', 'support', 'system', 'root',
-  // Дополнительный русский мат (словоформы)
-  'залупа', 'залупин', 'шлюха', 'шлюшка', 'пидорас',
-]);
-
-// Нормализация перед проверкой: убираем leetspeak замены
-function normalize(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/4/g, 'a')
-    .replace(/3/g, 'e')
-    .replace(/0/g, 'o')
-    .replace(/1/g, 'i')
-    .replace(/@/g, 'a')
-    .replace(/\$/g, 's')
-    .replace(/[_\-.]/g, ''); // f_u_c_k → fuck
-}
+  'залупа', 'залупин', 'шлюха', 'шлюшка', 'пидорас', 'пизда', 'пиздабол', 'долбаеб', 'блядина', 'хуй', '667', 'котак', 'ам', 'амшелек', 'ебарь',  'пидараз', 'щщс', 'ёбарь', 'секс', 'уебан', 'бля', 'пидарас', 'уебок', 'мал',
+  ]);
 
 export function containsBadWord(username: string): boolean {
-  // Проверяем и оригинал и нормализованную версию
-  return filter.check(username) || filter.check(normalize(username));
+  return filter.isProfane(username);
 }
