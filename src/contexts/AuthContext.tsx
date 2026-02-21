@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase, Profile } from '../lib/supabase';
+import { containsBadWord } from '../lib/profanityFilter';
 
 type AuthContextType = {
   user: User | null;
@@ -22,13 +23,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Обновление профиля вручную (для Реактора и Магазина)
   async function refreshProfile() {
     if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
-    
-    if (data) setProfile(data);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) setProfile(data);
+    } catch (error) {
+      console.error('Ошибка обновления профиля:', error);
+    }
   }
 
   useEffect(() => {
@@ -44,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Слушатель изменений авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Если произошло событие ВЫХОДА - чистим все
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
@@ -54,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           loadProfile(session.user.id);
         } else {
-          // Если сессии нет, но событие не SIGNED_OUT (на всякий случай)
           setProfile(null);
           setLoading(false);
         }
@@ -64,12 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Realtime подписка на профиль
+  // Realtime подписка на профиль — уникальный канал на каждого юзера
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel('profile-updates')
+      .channel(`profile-${user.id}`) // ← фикс: уникальное имя канала, без конфликтов в нескольких вкладках
       .on(
         'postgres_changes',
         {
@@ -90,29 +94,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   async function loadProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (data) {
-      setProfile(data);
+      if (error) throw error;
+      if (data) setProfile(data);
+    } catch (error) {
+      console.error('Ошибка загрузки профиля:', error);
+      // Профиль не загрузился, но приложение продолжает работу
+    } finally {
+      setLoading(false); // ← всегда сбрасываем loading, даже при ошибке
     }
-    setLoading(false);
   }
 
   async function signUp(email: string, password: string, username: string) {
+    const trimmed = username.trim();
+
+    // Валидация на уровне контекста (второй рубеж защиты)
+    if (trimmed.length < 3 || trimmed.length > 20) {
+      throw new Error('Имя должно быть от 3 до 20 символов');
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      throw new Error('Имя может содержать только латиницу, цифры и _');
+    }
+    if (containsBadWord(trimmed)) {
+      throw new Error('Недопустимое имя пользователя');
+    }
+
+    // Проверка уникальности username до регистрации
+    const { data: existing, error: checkError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', trimmed)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (existing) throw new Error('Это имя уже занято, придумайте другое');
+
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+
     if (data.user) {
-      await supabase.from('profiles').insert({
+      const { error: insertError } = await supabase.from('profiles').insert({
         id: data.user.id,
-        username,
+        username: trimmed,
         clearance_level: 0,
         total_experiments: 0,
         success_rate: 0,
       });
+      if (insertError) throw insertError;
     }
   }
 
@@ -121,24 +155,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }
 
-  // === ИСПРАВЛЕННАЯ ФУНКЦИЯ ВЫХОДА ===
   async function signOut() {
     try {
-      // 1. Пробуем выйти через Supabase
       await supabase.auth.signOut();
     } catch (error) {
-      console.error("Ошибка при выходе:", error);
+      console.error('Ошибка при выходе:', error);
     } finally {
-      // 2. В ЛЮБОМ СЛУЧАЕ очищаем состояние локально
       setUser(null);
       setProfile(null);
-      
-      // Можно почистить localStorage, если нужно сбросить онбординг
-      // localStorage.removeItem('onboarding_seen'); 
-      
-      // Перезагрузка страницы для гарантии сброса всех стейтов App.tsx
-      // (Опционально, но надежно)
-      // window.location.reload();
     }
   }
 
