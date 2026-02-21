@@ -22,7 +22,6 @@ import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
 import { useBotOpponent, getDeterministicBotName } from '../hooks/useBotOpponent';
-import { grantXp } from '../lib/xpSystem';
 import { recordCalibrationMatch } from '../lib/CalibrationSystem';
 import { PvPRank } from '../lib/PvPRankSystem';
 import { RankUpModal } from './RankUpModal';
