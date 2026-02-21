@@ -613,12 +613,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <>
               <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4 drop-shadow-lg" />
               <h1 className="text-4xl font-black text-yellow-400 mb-2">{t('pvp.win')}</h1>
-              
-              {xpGained && (
-                <div className="inline-flex items-center gap-2 px-4 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 font-bold mb-4">
-                   <Zap className="w-4 h-4 fill-current" /> +{xpGained} XP
-                </div>
-              )}
 
               {opponentDisconnected && !isBotMatch ? (
                  <p className="text-emerald-300 mb-6 text-sm">{t('pvp.opponent_resigned')}</p>
