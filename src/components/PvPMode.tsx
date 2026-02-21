@@ -359,14 +359,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       } catch (e) { console.error(e); }
     }
 
-    // 2. XP Logic (Only if Win)
-    if (isWin && user) {
-      try {
-        const res = await grantXp(user.id, profile?.is_premium || false, 50);
-        if (res) setXpGained(res.gained);
-      } catch (e) { console.error(e); }
-    }
-
     await refreshProfile();
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
   }
