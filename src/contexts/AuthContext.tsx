@@ -121,7 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
       throw new Error('Имя может содержать только латиницу, цифры и _');
     }
-    if (containsBadWord(trimmed)) throw new Error('Недопустимое имя пользователя');
+    if (containsBadWord(trimmed)) {
+      throw new Error('Недопустимое имя пользователя');
+    }
 
     // Проверка уникальности username до регистрации
     const { data: existing, error: checkError } = await supabase
