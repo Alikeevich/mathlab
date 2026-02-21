@@ -18,7 +18,7 @@ export async function recordCalibrationMatch(
 ): Promise<CalibrationState | null> {
   
   try {
-    // Вызываем SQL функцию, которую создали в Шаге 1
+    // Вызываем SQL функцию
     const { data, error } = await supabase.rpc('record_calibration_match', {
       user_id: userId,
       is_win: won,
@@ -36,7 +36,7 @@ export async function recordCalibrationMatch(
       matchesPlayed: data.matches_played,
       totalMatches: CALIBRATION_MATCHES,
       provisionalMMR: data.new_mmr,
-      results: [] // Историю результатов в UI обычно не показываем детально
+      results: [] 
     };
 
   } catch (err) {
@@ -56,12 +56,11 @@ export async function getCalibrationStatus(userId: string): Promise<CalibrationS
   if (error || !profile) return null;
 
   if (!profile.has_calibrated && !profile.is_calibrating) {
-    // Если еще не начинал
     return {
       isCalibrating: false,
       matchesPlayed: 0,
       totalMatches: CALIBRATION_MATCHES,
-      provisionalMMR: 1000,
+      provisionalMMR: 700,
       results: []
     };
   }
@@ -70,18 +69,12 @@ export async function getCalibrationStatus(userId: string): Promise<CalibrationS
     isCalibrating: profile.is_calibrating || false,
     matchesPlayed: profile.calibration_matches_played || 0,
     totalMatches: CALIBRATION_MATCHES,
-    provisionalMMR: profile.mmr || 1000,
+    provisionalMMR: profile.mmr || 700,
     results: profile.calibration_results || []
   };
 }
 
-// Функции startCalibration и resetCalibration можно удалить или оставить пустыми,
-// так как основная логика теперь внутри record_calibration_match.
 export async function startCalibration(userId: string): Promise<void> {
-    // Опционально: сброс перед началом, если нужно
-    await supabase.from('profiles').update({
-        is_calibrating: true,
-        calibration_matches_played: 0,
-        has_calibrated: false
-    }).eq('id', userId);
+    // Эта функция больше не нужна, так как старт происходит автоматически в record_calibration_match
+    // Но оставим её пустой для совместимости, если где-то есть вызов
 }
