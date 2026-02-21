@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { containsBadWord } from '../lib/profanityFilter';
 import {
   LogIn, UserPlus, Loader, Mail, CheckSquare, Square, Eye, EyeOff, CheckCircle,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ function validateUsername(value: string): string {
   if (trimmed.length < 3) return 'Минимум 3 символа';
   if (trimmed.length > 20) return 'Максимум 20 символов';
   if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return 'Только латиница, цифры и _';
+  if (containsBadWord(trimmed)) return 'Недопустимое имя пользователя';
   return '';
 }
 
